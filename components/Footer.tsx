@@ -29,6 +29,7 @@ export function Footer() {
               <li><Link href="/ask">Ask in Bangla</Link></li>
               <li><Link href="/plan">Family &amp; Money Plan</Link></li>
               <li><Link href="/privacy">Privacy &amp; Security</Link></li>
+              <li><Link href="/about">About &amp; business model</Link></li>
             </ul>
           </div>
         </div>
@@ -38,7 +39,6 @@ export function Footer() {
         {/* Official watermark: replace public/yunet-watermark.svg with the organisers' file (keep the same name, or update src). */}
         <div className="watermark" id="watermark">
           <img src="/yunet-watermark.svg" alt="Built for YUNet AIgnite Buildathon 2026" />
-          <span className="small muted">Built for YUNet AIgnite Buildathon 2026</span>
         </div>
       </div>
     </footer>

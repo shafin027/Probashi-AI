@@ -47,14 +47,6 @@ const PLANS = [
   },
 ];
 
-const REVENUE = [
-  ["Verified Offer Report", "৳299 per report", "AI cost about ৳10–20, payment fee about 2%, so about 90% gross margin"],
-  ["Family Plan", "৳149/month", "Recurring revenue from families in Bangladesh"],
-  ["Licensed remittance partners", "Referral bounty per activated user", "User gets a better legal rate than hundi"],
-  ["Skills and language courses", "15–20% commission", "Skilled workers earn more and pay off debt faster"],
-  ["Migrant insurance and fair loans", "10–15% commission", "Cheaper than informal moneylenders"],
-  ["Verified agency listing", "৳5,000–15,000/month", "Labelled \"Sponsored\". Can never change a risk score"],
-];
 
 export default function Home() {
   return (
@@ -109,11 +101,11 @@ export default function Home() {
 
       <section className="section section-alt" id="problem">
         <div className="container">
-          <h2>সমস্যা: The problem nobody has solved</h2>
-          <p className="muted" style={{ maxWidth: 760 }}>
-            Bangladesh runs on remittances, yet its workers pay some of the highest migration costs in the world, mostly to middlemen.
-            Government apps handle registration. Nobody tells the worker, in their own language, whether <em>this</em> offer at <em>this</em>{" "}
-            price is real.
+          <h2>সমস্যা: যা কেউ সমাধান করেনি</h2>
+          <p style={{ maxWidth: 760 }}>
+            প্রবাসীদের পাঠানো টাকায় দেশ চলে, অথচ বিদেশ যেতে আমাদের শ্রমিকরা দুনিয়ার সবচেয়ে বেশি খরচ দেন, যার বেশিরভাগ যায় দালালের পকেটে।
+            সরকারি অ্যাপে রেজিস্ট্রেশন হয়, কিন্তু টাকা দেওয়ার আগে কেউ বলে দেয় না: <em>এই</em> অফার, <em>এই</em> দামে, আসল কি না।
+            <span className="en">Workers pay some of the world&apos;s highest migration costs, mostly to middlemen. Nobody tells them, in their own language, whether this offer at this price is real.</span>
           </p>
           <Reveal className="grid grid-4" delay={0.05}>
             {STATS.map((s) => (
@@ -229,39 +221,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section section-alt" id="business">
-        <div className="container">
-          <h2>ব্যবসা ও ভারসাম্য · Business model with checks and balances</h2>
-          <div className="card table-wrap" style={{ marginTop: 16 }}>
-            <table className="small">
-              <thead>
-                <tr><th>Revenue stream</th><th>Price</th><th>Why it's fair</th></tr>
-              </thead>
-              <tbody>
-                {REVENUE.map((r) => (
-                  <tr key={r[0]}><td><strong>{r[0]}</strong></td><td>{r[1]}</td><td className="muted">{r[2]}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="grid grid-3" style={{ marginTop: 16 }}>
-            <div className="card"><h3>🔒 Scores can't be bought</h3><p className="small muted">Risk comes only from documents, rules, licences and verified complaints.</p></div>
-            <div className="card"><h3>🏷️ Every commission is shown</h3><p className="small muted">&ldquo;We earn ৳X if you choose this partner.&rdquo; Licensed partners only.</p></div>
-            <div className="card"><h3>↩️ Money-back promise</h3><p className="small muted">If the report misses a red flag it should have caught, the user gets a refund.</p></div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section" id="scale">
-        <div className="container">
-          <h2>বাংলাদেশ থেকে বিশ্বে · Built to scale</h2>
-          <p className="muted" style={{ maxWidth: 760 }}>
-            Nepal, India, Pakistan, Sri Lanka, the Philippines, Indonesia and East Africa send millions of workers through the same
-            Gulf and Malaysia corridors, and face the same brokers. Only the country data pack changes; the AI and rule engine are shared.
-          </p>
-          <div className="row">
-            <Link className="btn" href="/check">এখনই অফার চেক করুন</Link>
-          </div>
+      <section className="section section-alt">
+        <div className="container center">
+          <p className="muted" style={{ marginBottom: 12 }}>বিচারক, পার্টনার বা বিনিয়োগকারী? · Judges, partners and investors</p>
+          <Link className="btn btn-ghost" href="/about">ব্যবসায়িক মডেল ও পরিকল্পনা দেখুন · Business model &amp; roadmap →</Link>
         </div>
       </section>
     </>

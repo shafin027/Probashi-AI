@@ -39,7 +39,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(bin);
 }
 
-export function VoiceButton({ onText, lang = "bn-BD" }: { onText: (text: string) => void; lang?: string }) {
+export function VoiceButton({ onText, lang = "bn-BD", primary = false }: { onText: (text: string) => void; lang?: string; primary?: boolean }) {
   const { naturalVoice } = useFeatures();
   const [state, setState] = useState<"idle" | "recording" | "thinking">("idle");
   const [seconds, setSeconds] = useState(0);
@@ -139,7 +139,7 @@ export function VoiceButton({ onText, lang = "bn-BD" }: { onText: (text: string)
     <span className="voice-wrap">
       <button
         type="button"
-        className={`btn btn-ghost mic ${state === "recording" ? "mic-on" : ""}`}
+        className={`btn ${primary ? "" : "btn-ghost"} mic ${state === "recording" ? "mic-on" : ""}`}
         onClick={toggle}
         disabled={state === "thinking"}
         aria-label={state === "recording" ? "থামান · Stop recording" : state === "thinking" ? "বুঝছি · Transcribing" : "বলুন · Speak in Bangla"}

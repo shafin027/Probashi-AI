@@ -7,7 +7,6 @@ import { useFeatures } from "./features.tsx";
 import { ReadinessRing, useJourney } from "./journey.tsx";
 
 const LINKS = [
-  { href: "/check", label: "অফার চেক", en: "Offer check" },
   { href: "/cost", label: "খরচ হিসাব", en: "Cost" },
   { href: "/agency", label: "এজেন্সি যাচাই", en: "Agencies" },
   { href: "/ask", label: "প্রশ্ন করুন", en: "Ask" },
@@ -75,7 +74,7 @@ export function Nav() {
               </Link>
             ))}
           <Link href="/check" className="btn btn-sm nav-cta">
-            ফ্রি যাচাই
+            অফার চেক করুন (ফ্রি)
           </Link>
         </nav>
       </div>

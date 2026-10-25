@@ -6,7 +6,7 @@ import { useFeatures } from "./features.tsx";
 import { EMPTY_PROGRESS, levelFor, MILESTONES, mergeProgress, sanitiseProgress, score, type MilestoneId, type Progress } from "@/lib/journey.ts";
 
 type Celebration = { id: number; title: string; sub: string; points: number };
-type Ctx = { progress: Progress; points: number; complete: (id: MilestoneId) => void; setQuizBest: (pct: number) => void; ready: boolean };
+type Ctx = { progress: Progress; points: number; complete: (id: MilestoneId, opts?: { quiet?: boolean }) => void; setQuizBest: (pct: number) => void; ready: boolean };
 
 const JourneyContext = createContext<Ctx>({ progress: EMPTY_PROGRESS, points: 0, complete: () => {}, setQuizBest: () => {}, ready: false });
 const KEY = "pa-journey-v1";
@@ -69,24 +69,25 @@ export function JourneyProvider({ children }: { children: React.ReactNode }) {
   }, [progress]);
 
   const update = useCallback(
-    (fn: (p: Progress) => Progress) => {
+    (fn: (p: Progress) => Progress, quiet = false) => {
       const prev = current.current;
       const next = fn(prev);
       if (next === prev) return;
       current.current = next;
       setProgress(next);
       writeLocal(next);
-      const gained = MILESTONES.filter((m) => next.done.includes(m.id) && !prev.done.includes(m.id));
+      const gained = quiet ? [] : MILESTONES.filter((m) => next.done.includes(m.id) && !prev.done.includes(m.id));
       for (const m of gained) celebrate({ title: m.bn, sub: m.en, points: m.points });
       const lvl = levelFor(score(next));
-      if (lvl.min > levelFor(score(prev)).min) celebrate({ title: `${lvl.emoji} নতুন ধাপ: ${lvl.bn}`, sub: `Level up: ${lvl.en}`, points: 0 });
+      if (!quiet && lvl.min > levelFor(score(prev)).min) celebrate({ title: `${lvl.emoji} নতুন ধাপ: ${lvl.bn}`, sub: `Level up: ${lvl.en}`, points: 0 });
       if (me) void push(next);
     },
     [celebrate, me, push],
   );
 
   const complete = useCallback(
-    (id: MilestoneId) => update((p) => (p.done.includes(id) ? p : { ...p, done: [...p.done, id], updatedAt: Date.now() })),
+    (id: MilestoneId, opts?: { quiet?: boolean }) =>
+      update((p) => (p.done.includes(id) ? p : { ...p, done: [...p.done, id], updatedAt: Date.now() }), opts?.quiet),
     [update],
   );
 

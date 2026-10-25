@@ -91,9 +91,9 @@ export default function JourneyPage() {
               <div style={{ flex: 1 }}>
                 <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
                   <strong>{m.bn}</strong>
-                  <span className="badge">{done ? "সম্পন্ন" : `+${m.points}`}</span>
+                  <span className="badge">{done ? (m.manual ? "সম্পন্ন (নিজে জানানো)" : "সম্পন্ন") : `+${m.points}`}</span>
                 </div>
-                <div className="small">{m.en}</div>
+                <div className="small">{m.en}{m.manual && <span className="self-reported"> · self-reported</span>}</div>
                 <div className="small muted">{m.why}</div>
                 {!done && (
                   <div className="row" style={{ marginTop: 10, gap: 8 }}>

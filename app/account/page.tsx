@@ -91,7 +91,7 @@ export default function AccountPage() {
               <div className="memory-item" key={m.id}>
                 <div>
                   <span className="badge">{KIND[m.kind] ?? m.kind}</span>
-                  <div className="small" style={{ marginTop: 4 }}>{m.content}</div>
+                  <div className="small" style={{ marginTop: 4 }}>{m.content.replace(/^User asked:\s*/, "আপনি জিজ্ঞেস করেছিলেন: ")}</div>
                   <div className="small muted">{new Date(m.created_at).toLocaleString("bn-BD")}</div>
                 </div>
                 <button className="btn btn-ghost btn-sm" aria-label="Forget this" disabled={busy} onClick={async () => { await call("/api/memories", "DELETE", { id: m.id }); await load(); }}>
@@ -126,7 +126,7 @@ export default function AccountPage() {
             <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>বাতিল</button>
           </div>
         ) : (
-          <button className="btn btn-ghost" onClick={() => setConfirmDelete(true)}>Delete my account</button>
+          <button className="btn btn-danger-outline" onClick={() => setConfirmDelete(true)}>অ্যাকাউন্ট মুছুন · Delete my account</button>
         )}
       </div>
     </div>

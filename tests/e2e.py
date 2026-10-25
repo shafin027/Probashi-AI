@@ -18,7 +18,7 @@ BASE = os.environ.get("BASE_URL", "http://localhost:3300")
 NO_AI = os.environ.get("NO_AI_URL", "http://localhost:3301")
 HERE = os.path.dirname(os.path.abspath(__file__))
 AXE = os.path.join(HERE, "..", "node_modules", "axe-core", "axe.min.js")
-PAGES = ["/", "/check", "/cost", "/agency", "/ask", "/plan", "/quiz", "/journey", "/login", "/privacy"]
+PAGES = ["/", "/check", "/cost", "/agency", "/ask", "/plan", "/quiz", "/journey", "/login", "/privacy", "/about"]
 
 # Ground truth for the quiz, read from the app's own data (not from the page).
 SCENARIOS = json.loads(subprocess.check_output(
@@ -143,15 +143,19 @@ with sync_playwright() as p:
         page.get_by_label("কত টাকা চাইছে? (৳)").fill("650000")
         page.get_by_role("button", name="Check now").click()
         page.wait_for_selector("#result", timeout=60000)
-        page.wait_for_selector(".toast >> text=অফার যাচাই করেছেন", timeout=5000)
-        check(True, f"[{name}] milestone celebration toast shown")
+        page.wait_for_timeout(600)
+        check(page.locator(".toast").count() == 0, f"[{name}] no celebration while showing a danger verdict (ethics)")
+        focused = page.evaluate("document.activeElement && document.activeElement.id")
+        check(focused == "verdict-title", f"[{name}] focus moves to the verdict for screen readers ({focused})")
+        unlock_bg = page.get_by_role("button", name="Get full report").evaluate("e => getComputedStyle(e).backgroundColor")
+        check(unlock_bg in ("rgba(0, 0, 0, 0)", "transparent"), f"[{name}] paid upsell is a calm secondary button, not red ({unlock_bg})")
         result = page.locator("#result").inner_text()
         check("বিপদ" in result, f"[{name}] uploaded offer flagged as danger")
         check("AI document reading" in result, f"[{name}] AI read the uploaded document")
         check("Al Noor Cleaning Co." in result, f"[{name}] employer extracted from document")
         check("SECRET_NEGOTIATION_SCRIPT" not in page.content(), f"[{name}] paid content not in page before payment")
         page.screenshot(path=f"{SHOTS}/{name}-check.png", full_page=True)
-        page.get_by_role("button", name="Unlock").click()
+        page.get_by_role("button", name="Get full report").click()
         page.get_by_label("মোবাইল নম্বর").fill("01712345678")
         page.get_by_role("button", name="Pay ৳299 (demo)").click()
         page.wait_for_selector("text=SECRET_NEGOTIATION_SCRIPT", timeout=15000)
@@ -188,7 +192,7 @@ with sync_playwright() as p:
         page.screenshot(path=f"{SHOTS}/{name}-ask.png", full_page=True)
 
         # ---------- Other pages ----------
-        for path, marker in [("/cost", "৳78,990"), ("/agency", "Demo directory"), ("/plan", "Debt-free in"), ("/privacy", "How it is protected")]:
+        for path, marker in [("/cost", "৳78,990"), ("/agency", "Demo directory"), ("/plan", "Debt-free in"), ("/privacy", "How it is protected"), ("/about", "Business model with checks and balances")]:
             page.goto(f"{BASE}{path}")
             page.wait_for_load_state("networkidle")
             check(marker in page.content(), f"[{name}] {path} renders")
@@ -217,6 +221,8 @@ with sync_playwright() as p:
             page.locator(".quiz-card .verdict .btn").click()
         page.wait_for_selector("text=6/6 সঠিক")
         check(True, f"[{name}] quiz completes with 100% when answered correctly")
+        page.wait_for_selector(".toast >> text=প্রতারণা চেনার পরীক্ষায় পাস", timeout=5000)
+        check(True, f"[{name}] earned milestone is celebrated (positive moment)")
         page.goto(f"{BASE}/journey")
         page.wait_for_load_state("networkidle")
         page.get_by_role("button", name="✓ আমি করেছি").first.click()
@@ -274,11 +280,14 @@ with sync_playwright() as p:
     page.wait_for_selector("img[alt='Uploaded document']")
     page.get_by_role("button", name="Check now").click()
     page.wait_for_selector("#result", timeout=180000)
-    text = page.locator("#offerText").input_value()
+    text = page.locator("#ocrText").input_value()
+    check(page.locator("#cost").input_value() == "650000", f"[ocr] asked cost auto-filled from the photo ({page.locator('#cost').input_value()!r})")
+    check(page.locator("#salary").input_value() == "1200", "[ocr] salary auto-filled from the photo")
     check("SAR" in text and "1200" in text, f"[ocr] Tesseract read salary from the photo on-device: {text[:80]!r}")
     check("FREE VISA" in text.upper(), "[ocr] Tesseract read the visa line")
     check(page.locator(".flag", has_text="Free / azad visa").count() == 1, "[ocr] on-device text fed the rule engine (free visa flagged)")
-    check("Rule engine only" in page.locator("#result").inner_text(), "[ocr] no cloud AI was used")
+    check("Rule-based check" in page.locator("#result").inner_text(), "[ocr] no cloud AI was used")
+    check(page.locator(".flag", has_text="Asked cost").count() == 1, "[ocr] auto-filled cost triggered the overcharge check")
     ocr_reqs = []
     page.on("request", lambda r: ocr_reqs.append(r.url))
     check(not [e for e in problems if "Content Security Policy" in e or "Refused" in e], f"[ocr] OCR worker runs under the strict CSP {problems[:2]}")

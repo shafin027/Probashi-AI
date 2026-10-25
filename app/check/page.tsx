@@ -10,6 +10,7 @@ import { PayModal } from "@/components/PayModal.tsx";
 import { useJourney } from "@/components/journey.tsx";
 import { useFeatures } from "@/components/features.tsx";
 import { readTextOnDevice } from "@/components/ocr.ts";
+import { extractFacts } from "@/lib/extract.ts";
 
 type Result = {
   score: number;
@@ -109,24 +110,42 @@ export default function CheckPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [stage, setStage] = useState(0);
   const [ocr, setOcr] = useState<{ busy: boolean; pct: number; note: string }>({ busy: false, pct: 0, note: "" });
+  const [ocrText, setOcrText] = useState("");
   const { complete } = useJourney();
   const { ai: aiAvailable } = useFeatures();
 
-  /** Reads text from the photo on this phone (Tesseract, Bangla + English). Returns the text. */
-  async function runOcr(): Promise<string> {
-    if (!doc?.preview) return "";
+  /** Reads text from the photo on this phone (Tesseract, Bangla + English). Returns the text and extracted numbers. */
+  async function runOcr(): Promise<{ text: string; facts: ReturnType<typeof extractFacts> }> {
+    if (!doc?.preview) return { text: "", facts: {} };
     setOcr({ busy: true, pct: 0, note: "" });
     try {
       const { text, confidence } = await readTextOnDevice(doc.preview, (f, status) => {
         if (status.includes("recogniz")) setOcr((o) => ({ ...o, pct: Math.round(f * 100) }));
       });
       const clean = text.slice(0, 3000);
-      if (clean) setOfferText((p) => (p ? `${p}\n\n${clean}` : clean));
-      setOcr({ busy: false, pct: 100, note: clean ? `ফোনেই ${clean.length} অক্ষর পড়া হয়েছে (confidence ${Math.round(confidence)}%). Check and correct the text below.` : "No readable text found in this photo." });
-      return clean;
+      setOcrText(clean);
+      // Fill the form from what was read, without overwriting anything the user typed.
+      const facts = extractFacts(clean);
+      const filled: string[] = [];
+      if (facts.costBdt && !askedCostBdt) {
+        setAskedCostBdt(String(facts.costBdt));
+        filled.push("খরচ");
+      }
+      if (facts.salary && !salaryLocal) {
+        setSalaryLocal(String(facts.salary));
+        filled.push("বেতন");
+      }
+      setOcr({
+        busy: false,
+        pct: 100,
+        note: clean
+          ? `✓ ফোনেই লেখা পড়া হয়েছে${filled.length ? `, ${filled.join(" ও ")} ঘরে বসানো হয়েছে` : ""}। মিলিয়ে দেখুন। (Read on this phone, ${Math.round(confidence)}% confidence.)`
+          : "এই ছবিতে পড়ার মতো লেখা পাওয়া যায়নি। No readable text found.",
+      });
+      return { text: clean, facts };
     } catch {
       setOcr({ busy: false, pct: 0, note: "On-device reading isn't supported on this browser." });
-      return "";
+      return { text: "", facts: {} };
     }
   }
 
@@ -177,8 +196,13 @@ export default function CheckPage() {
     setPremium(null);
     try {
       // Without cloud AI, read the photo on the device so the rule engine still sees its text.
-      let text = offerText;
-      if (!aiAvailable && doc?.preview && !offerText.trim()) text = await runOcr();
+      let read = ocrText;
+      let facts = ocrText ? extractFacts(ocrText) : {};
+      if (!aiAvailable && doc?.preview && !read) ({ text: read, facts } = await runOcr());
+      // Values typed by the user win; otherwise use what was read from the photo in this same submit.
+      const cost = askedCostBdt ? Number(askedCostBdt) : facts.costBdt;
+      const salary = salaryLocal ? Number(salaryLocal) : facts.salary;
+      const text = [offerText.trim(), read.trim()].filter(Boolean).join("\n\n");
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -186,8 +210,8 @@ export default function CheckPage() {
           input: {
             countryCode,
             jobTitle: jobTitle || undefined,
-            salaryLocal: salaryLocal ? Number(salaryLocal) : undefined,
-            askedCostBdt: askedCostBdt ? Number(askedCostBdt) : undefined,
+            salaryLocal: salary || undefined,
+            askedCostBdt: cost || undefined,
             agencyQuery: agencyQuery || undefined,
             offerText: text || undefined,
             visaType,
@@ -204,9 +228,14 @@ export default function CheckPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
       setResult(json);
-      complete("checked_offer");
-      if (json.agency) complete("verified_agency");
-      setTimeout(() => document.getElementById("result")?.scrollIntoView({ behavior: "smooth" }), 50);
+      // No celebration while someone is being told they may be scammed.
+      const quiet = json.verdict !== "safe";
+      complete("checked_offer", { quiet });
+      if (json.agency) complete("verified_agency", { quiet });
+      setTimeout(() => {
+        document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("verdict-title")?.focus({ preventScroll: true });
+      }, 60);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -222,9 +251,9 @@ export default function CheckPage() {
   return (
     <div className="container section">
       <h1>অফার চেক</h1>
-      <p className="muted">
-        Upload the visa, contract or offer message, or fill in what you know. The free check takes about 20 seconds.
-        <span className="en">Your documents are used only for this check and are not stored.</span>
+      <p className="hero-lead" style={{ fontSize: "1.05rem" }}>
+        ভিসা বা চুক্তিপত্রের ছবি দিন, অথবা যা জানেন লিখুন। ফ্রি যাচাই, মাত্র ২০ সেকেন্ড।
+        <span className="en">Upload the visa, contract or offer, or fill in what you know. Free, about 20 seconds. Documents are never stored.</span>
       </p>
       <button type="button" className="btn btn-ghost no-print" onClick={loadSample} style={{ marginBottom: 16 }}>
         ✨ উদাহরণ দেখুন (load a sample scam offer)
@@ -250,8 +279,8 @@ export default function CheckPage() {
           <input id="doc" type="file" accept="image/*,application/pdf" capture="environment" onChange={onFile} style={{ display: "none" }} />
           {doc && (
             <div className="row" style={{ marginTop: 8, gap: 8 }}>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDoc(null); setOcr({ busy: false, pct: 0, note: "" }); }}>
-                Remove file
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDoc(null); setOcrText(""); setOcr({ busy: false, pct: 0, note: "" }); }}>
+                ✕ ছবি সরান
               </button>
               {doc.preview && (
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => void runOcr()} disabled={ocr.busy}>
@@ -265,7 +294,13 @@ export default function CheckPage() {
               <span style={{ width: `${Math.max(ocr.pct, 4)}%` }} />
             </div>
           )}
-          {ocr.note && <p className="small muted" role="status" style={{ marginTop: 6 }}>{ocr.note}</p>}
+          {ocr.note && <p className="small" role="status" style={{ marginTop: 6 }}>{ocr.note}</p>}
+          {ocrText && (
+            <details className="ocr-box" open>
+              <summary>ছবি থেকে পড়া লেখা · Text read from the photo</summary>
+              <textarea id="ocrText" aria-label="Text read from the photo" value={ocrText} onChange={(e) => setOcrText(e.target.value)} />
+            </details>
+          )}
           <div className="field" style={{ marginTop: 16 }}>
             <label htmlFor="offerText">দালাল/এজেন্সি কী বলেছে? · What were you told?</label>
             <textarea
@@ -302,6 +337,8 @@ export default function CheckPage() {
               <input id="salary" inputMode="numeric" value={salaryLocal} onChange={(e) => setSalaryLocal(e.target.value.replace(/\D/g, ""))} placeholder="e.g. 1500" />
             </div>
           </div>
+          <details className="more-fields">
+            <summary>আরও তথ্য দিন (ঐচ্ছিক) · More details make the check sharper</summary>
           <div className="field">
             <label htmlFor="job">কাজ · Job</label>
             <input id="job" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="e.g. Construction worker" />
@@ -337,8 +374,9 @@ export default function CheckPage() {
               <Choice value={passport} onChange={setPassport} options={[["yes", "হ্যাঁ"], ["no", "না"]]} />
             </div>
           </div>
-          <button className="btn" type="submit" disabled={loading} style={{ width: "100%" }}>
-            {loading ? "যাচাই হচ্ছে… (AI reading)" : "ফ্রি যাচাই করুন · Check now"}
+          </details>
+          <button className="btn submit-sticky" type="submit" disabled={loading} style={{ width: "100%" }}>
+            {loading ? "যাচাই হচ্ছে…" : "ফ্রি যাচাই করুন · Check now"}
           </button>
           {loading && (
             <ol className="progress" aria-live="polite">
@@ -350,7 +388,7 @@ export default function CheckPage() {
           {error && <p role="alert" style={{ color: "var(--danger)", marginTop: 12 }}>{error}</p>}
           <div className="security-note" style={{ marginTop: 12 }}>
             <span aria-hidden>🔒</span>
-            <span>Encrypted connection. Files are checked for safety, used once for this check, and never stored or shown to agencies.</span>
+            <span>এনক্রিপ্টেড সংযোগ। ছবি শুধু এই যাচাইয়ে ব্যবহার হয়, কোথাও রাখা হয় না, এজেন্সি দেখতে পায় না। <span className="en">Encrypted. Used once, never stored or shared.</span></span>
           </div>
         </div>
       </form>
@@ -367,9 +405,9 @@ export default function CheckPage() {
                 style={{ ["--v" as string]: Math.max(result.score, 3), ["--c" as string]: RING_COLOR[result.verdict] }}
               />
               <div style={{ flex: 1, minWidth: 200 }}>
-                <h2 style={{ margin: 0 }}>{v.bn}</h2>
+                <h2 id="verdict-title" tabIndex={-1} style={{ margin: 0 }}>{v.bn}</h2>
                 <div className="muted">{v.en}</div>
-                <div className="small muted">নিরাপত্তা স্কোর · safety score / 100</div>
+                <div className="small muted">নিরাপত্তা স্কোর {result.score}/100: যত কম, তত ঝুঁকি। ৮০+ সবুজ, ৫০–৭৯ হলুদ, বড় কোনো ঝুঁকি থাকলে লাল।</div>
               </div>
             </div>
             {result.ai && (
@@ -380,8 +418,9 @@ export default function CheckPage() {
               </div>
             )}
             <p className="small muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              {result.aiMode === "ai" ? "AI document reading + rule engine" : "Rule engine only (AI not configured or unavailable)"}
-              {result.aiError ? ` · ${result.aiError}` : ""}
+              {result.aiMode === "ai"
+                ? "এআই কাগজ পড়েছে + আইনের নিয়ম মিলিয়ে দেখা হয়েছে · AI document reading + rule engine"
+                : "দ্রুত যাচাই: আইনের নিয়ম মিলিয়ে দেখা হয়েছে। এআই বিশ্লেষণ এখন পাওয়া যাচ্ছে না, পরে আবার চেষ্টা করুন। · Rule-based check"}
             </p>
           </div>
 
@@ -392,7 +431,7 @@ export default function CheckPage() {
               <div className="stack">
                 {result.flags.map((f) => (
                   <div key={f.id} className={`flag flag-${f.severity}`}>
-                    <strong>{f.titleBn}</strong> <span className="badge">{f.severity}</span>
+                    <strong>{f.titleBn}</strong> <span className={`badge sev-${f.severity}`}>{f.severity === "high" ? "বড় ঝুঁকি" : f.severity === "medium" ? "মাঝারি" : "কম"}</span>
                     <div className="small">{f.title}</div>
                     <div className="small muted">{f.detail}</div>
                   </div>
@@ -403,11 +442,11 @@ export default function CheckPage() {
               <h3>💰 খরচের হিসাব · Cost check</h3>
               <table className="small">
                 <tbody>
-                  <tr><td>Official limit (সরকারি)</td><td><strong>{fmt(result.cost.officialCostBdt)}</strong></td></tr>
-                  <tr><td>You are asked (চাইছে)</td><td><strong>{fmt(result.cost.askedCostBdt)}</strong></td></tr>
-                  <tr><td>Extra (বাড়তি)</td><td style={{ color: (result.cost.overchargeBdt ?? 0) > 0 ? "var(--danger)" : undefined }}><strong>{fmt(result.cost.overchargeBdt)}</strong></td></tr>
-                  <tr><td>Salary in taka (approx.)</td><td>{fmt(result.cost.salaryBdt)}</td></tr>
-                  <tr><td>Months to repay (60% saved)</td><td>{result.cost.monthsToRepay ?? "—"}</td></tr>
+                  <tr><td>সরকারি সর্বোচ্চ খরচ <span className="en">Official limit</span></td><td><strong>{fmt(result.cost.officialCostBdt)}</strong></td></tr>
+                  <tr><td>আপনার কাছে চাইছে <span className="en">You are asked</span></td><td><strong>{fmt(result.cost.askedCostBdt)}</strong></td></tr>
+                  <tr><td>বাড়তি টাকা <span className="en">Extra</span></td><td style={{ color: (result.cost.overchargeBdt ?? 0) > 0 ? "var(--danger)" : undefined }}><strong>{fmt(result.cost.overchargeBdt)}</strong></td></tr>
+                  <tr><td>বেতন টাকায় (আনুমানিক) <span className="en">Salary in taka</span></td><td>{fmt(result.cost.salaryBdt)}</td></tr>
+                  <tr><td>খরচ তুলতে কত মাস <span className="en">Months to repay (60% saved)</span></td><td>{result.cost.monthsToRepay ?? "—"}</td></tr>
                 </tbody>
               </table>
               {result.country && <p className="small muted" style={{ marginTop: 8 }}>Source: {result.country.officialCostSource}. Re-check on bmet.gov.bd.</p>}
@@ -441,7 +480,7 @@ export default function CheckPage() {
           )}
 
           <div className="card">
-            <h3>📋 পূর্ণ রিপোর্ট · Full Verified Report</h3>
+            <h3>📋 পূর্ণ রিপোর্ট (ঐচ্ছিক) · Full report (optional)</h3>
             {result.ai && result.reportToken ? (
               premium ? (
                 <div className="stack">
@@ -466,22 +505,27 @@ export default function CheckPage() {
                   </div>
                 </div>
               ) : (
-                <div className="locked">
-                  <div className="blur" aria-hidden>
-                    <p>ভাই, আমি বিএমইটি-র সরকারি খরচের তালিকা দেখেছি। এই দেশের জন্য সর্বোচ্চ খরচ নির্ধারিত আছে, তাই আমি রসিদ ছাড়া…</p>
-                    <ol><li>আপনার RL নম্বর কত?</li><li>মালিকের নাম ও ঠিকানা কী?</li><li>চুক্তিপত্রের কপি কবে পাব?</li></ol>
-                  </div>
-                  <div className="unlock">
-                    <button className="btn btn-accent" type="button" onClick={() => setPayOpen(true)}>
-                      ৳299 দিয়ে আনলক করুন · Unlock
+                <div className="premium-offer">
+                  <p style={{ marginTop: 0 }}>
+                    উপরের ফ্রি ফলাফলই সম্পূর্ণ। এখনই কী করবেন তা সেখানে আছে। আরও প্রস্তুতি চাইলে ঐচ্ছিক পূর্ণ রিপোর্টে পাবেন:
+                    <span className="en">Your free result above is complete. The optional report adds:</span>
+                  </p>
+                  <ul className="trust-list" style={{ margin: "8px 0 14px" }}>
+                    <li>এজেন্সির সাথে দরকষাকষির কথা, পড়ে শোনানো যায় · A negotiation script you can listen to</li>
+                    <li>টাকা দেওয়ার আগে ৮–১০টি জরুরি প্রশ্ন · Questions to ask before paying</li>
+                    <li>পরিবারের জন্য প্রিন্ট/PDF রিপোর্ট · A printable report for your family</li>
+                  </ul>
+                  <div className="row">
+                    <button className="btn btn-ghost" type="button" onClick={() => setPayOpen(true)}>
+                      পূর্ণ রিপোর্ট নিন · Get full report ৳299
                     </button>
+                    <span className="small muted">ঝুঁকি ধরতে না পারলে টাকা ফেরত · Money back if we miss a red flag</span>
                   </div>
                 </div>
               )
             ) : (
               <p className="muted small">
-                The full report (negotiation script, agency questions, printable family report) needs AI analysis. Add an offer message or
-                document, with AI enabled on the server.
+                পূর্ণ রিপোর্টের জন্য এআই বিশ্লেষণ দরকার, যা এখন পাওয়া যাচ্ছে না। উপরের ফ্রি ফলাফল অনুযায়ী ব্যবস্থা নিন। <span className="en">The full report needs AI analysis, which isn&apos;t available right now.</span>
               </p>
             )}
             <div className="row no-print" style={{ marginTop: 12 }}>

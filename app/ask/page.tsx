@@ -74,20 +74,6 @@ export default function AskPage() {
           <h1 style={{ marginBottom: 4 }}>প্রশ্ন করুন</h1>
           <p className="muted" style={{ margin: 0 }}>Ask anything about working abroad, by voice or text. {naturalVoice ? "Natural Bangla voice on." : ""}</p>
         </div>
-        <label className="row small" style={{ fontWeight: 500, margin: 0 }}>
-          <input
-            type="checkbox"
-            style={{ width: 20, minHeight: 20 }}
-            checked={autoSpeak}
-            onChange={(e) => {
-              setAutoSpeak(e.target.checked);
-              try {
-                localStorage.setItem("pa-autospeak", e.target.checked ? "1" : "0");
-              } catch {}
-            }}
-          />
-          উত্তর পড়ে শোনাও
-        </label>
       </div>
 
       {accounts && !me && (
@@ -149,11 +135,25 @@ export default function AskPage() {
             }}
             placeholder="এখানে লিখুন…"
           />
-          <VoiceButton onText={(t) => send(t)} />
-          <button className="btn" type="submit" disabled={loading || !input.trim()}>
+          <VoiceButton primary onText={(t) => send(t)} />
+          <button className="btn btn-ghost" type="submit" disabled={loading || !input.trim()}>
             পাঠান
           </button>
         </form>
+        <label className="row small" style={{ fontWeight: 500, margin: "10px 0 0" }}>
+          <input
+            type="checkbox"
+            style={{ width: 20, minHeight: 20 }}
+            checked={autoSpeak}
+            onChange={(e) => {
+              setAutoSpeak(e.target.checked);
+              try {
+                localStorage.setItem("pa-autospeak", e.target.checked ? "1" : "0");
+              } catch {}
+            }}
+          />
+          উত্তর পড়ে শোনাও
+        </label>
       </div>
       <p className="small muted" style={{ marginTop: 12 }}>
         বিপদে থাকলে: প্রবাস বন্ধু কল সেন্টার <a href="tel:16135">16135</a> · জরুরি <a href="tel:999">999</a>
