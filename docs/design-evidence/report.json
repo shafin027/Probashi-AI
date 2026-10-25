@@ -1,0 +1,78 @@
+{
+  "contract": "surface: Probashi AI public web app (landing, offer check, journey); job: A Bangladeshi migrant worker or family member checks an overseas job offer before paying a broker; primaryAction: Upload or describe an offer and get a green/yellow/red verdict with next steps; direction: Calm authority: editorial Bangla serif headlines, forest green dominant, gold only for achievements, terracotta only for danger; signature motif = verified seal; hierarchy: Verdict and next step first; explanation second; optional paid report last and visually quiet; constraints: Bangla-first, low literacy, cheap Android phones on slow 4G; WCAG 2.2 AA; strict nonce CSP; motion must respect prefers-reduced-motion and never hide content; performanceBudget: On 4x CPU slowdown + slow 4G: JS <= 450 KB, LCP <= 4000 ms, CLS <= 0.1, TBT <= 900 ms per page",
+  "targetViewports": [
+    "390x844",
+    "1280x900"
+  ],
+  "accessibility": {
+    "status": "pass",
+    "evidence": "axe-core WCAG 2.0/2.1/2.2 A+AA scan of 11 pages at 390x844 and 1280x900 reports zero serious/critical violations (tests/e2e.py axe_scan). Fixed during this pass: step-number colour contrast; earlier passes fixed label-in-name and 24px target size. Focus moves to the verdict heading after a check (asserted). Touch targets 44px. Reduced-motion run asserts hero final state, all flags, verdict and every step are visible."
+  },
+  "responsive": {
+    "status": "pass",
+    "evidence": "E2E asserts no horizontal scroll on landing, check, cost, agency, plan, privacy, about at 390 and 1280 widths; how-it-works switches from sticky scrollytelling (>=960px) to a stacked list on mobile; mobile menu opens and closes on tap; perf run at 390x844 mobile emulation measured CLS 0 on /, 0.003 on /check, 0 on /journey and /ask after switching fonts to display:optional (was 0.46 with swap)."
+  },
+  "contentStates": {
+    "loading": {
+      "status": "pass",
+      "evidence": "Offer check shows staged progress (reading, rules, agency, report) plus skeleton result cards of the final footprint; journey teaser renders a same-size skeleton until local progress loads (no layout shift)."
+    },
+    "empty": {
+      "status": "pass",
+      "evidence": "Journey at 0 points shows level 'Getting started' and the single next step with a CTA; chat shows a greeting and starter question chips; memories list explains how to create the first memory."
+    },
+    "error": {
+      "status": "pass",
+      "evidence": "Disguised or oversized uploads return plain-language Bangla/English errors with a way to retry (integration tests 415/413); network failure in chat shows a retry message with the 16135 helpline; payment errors are shown inline in the modal."
+    },
+    "partial": {
+      "status": "pass",
+      "evidence": "When cloud AI is unavailable the check returns the rule-engine verdict marked 'Rule-based check' and on-device OCR fills the form (E2E [ocr] checks); the paid report explains it needs AI and points back to the free result."
+    },
+    "success": {
+      "status": "pass",
+      "evidence": "Verdict with drawn seal, score explained in words, red flags by severity, cost table, next steps, share to family; milestone celebration only on positive moments (asserted no toast on danger)."
+    },
+    "permission": {
+      "status": "pass",
+      "evidence": "Microphone denial shows 'Allow microphone access' and typing remains available; account and memories redirect to login when signed out (E2E); progress is kept on-device for guests with a prompt to log in."
+    }
+  },
+  "renderedEvidence": [
+    {
+      "viewport": "1280x900",
+      "artifact": "desktop-home.png",
+      "observation": "Hero: seal eyebrow, two-line Bangla headline with terracotta emphasis, magnetic primary CTA, GSAP offer-scan demo card with flags and danger ring; sources strip; readiness teaser; sticky how-it-works with Hairline figure and scroll progress line."
+    },
+    {
+      "viewport": "390x844",
+      "artifact": "mobile-home.png",
+      "observation": "Single column; CTAs stacked full-width-ish at 54px; demo card below the fold-safe copy; how-it-works as stacked cards; no horizontal scroll."
+    },
+    {
+      "viewport": "1280x900",
+      "artifact": "desktop-check.png",
+      "observation": "Uploaded offer letter preview, optional fields collapsed, verdict with drawn danger seal and explained score, flags with Bangla severity badges, calm optional report card."
+    },
+    {
+      "viewport": "390x844",
+      "artifact": "mobile-check.png",
+      "observation": "Sticky submit button, collapsed optional details, verdict focused after check, cost table with Bangla-first labels."
+    },
+    {
+      "viewport": "1280x900",
+      "artifact": "desktop-journey.png",
+      "observation": "Readiness ring at 55 'Prepared', next-step card, three phases with per-phase meters, phase 2 unlocked, protect-others share completed."
+    },
+    {
+      "viewport": "390x844",
+      "artifact": "mobile-journey.png",
+      "observation": "Hairline figure hidden under 640px so steps are above the fold; phases stack; toasts anchored bottom-left away from results."
+    }
+  ],
+  "knownLimits": [
+    "Live AI/OCR quality with real Claude/OpenAI keys is untested in this environment (npm run test:live).",
+    "Bangla on-device OCR model is installed but only an English letter was verified (no Bangla font to render a test image here).",
+    "Visual quality was judged by the builder plus one independent agent audit earlier; no user testing with migrant workers yet."
+  ]
+}

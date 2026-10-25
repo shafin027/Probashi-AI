@@ -1,20 +1,18 @@
 import Link from "next/link";
 import { WHY_FAQ } from "@/lib/faq.ts";
 import { JourneyTeaser, LiveStats, Reveal, TrustFigure } from "@/components/landing.tsx";
+import { HeroDemo } from "@/components/premium/HeroDemo.tsx";
+import { HowItWorks } from "@/components/premium/HowItWorks.tsx";
+import { CountUp, Magnetic, Seal, Tilt } from "@/components/premium/motion-bits.tsx";
 
 const STATS = [
-  { value: "11.3 লাখ", label: "people went abroad for work in 2025", src: "BMET / RMMRU" },
-  { value: "$35.6B", label: "remittance in FY2025-26, a record", src: "Bangladesh Bank via Prothom Alo" },
-  { value: "৫.৭×", label: "up to this much: real Malaysia cost vs. the Tk 78,990 official limit", src: "Dhaka Tribune / Ministry" },
-  { value: "২৪%", label: "of complainants with work permits actually got the job", src: "BMET arbitration study, TBS" },
+  { n: 11.3, decimals: 1, suffix: " লাখ", locale: "bn-BD", label: "people went abroad for work in 2025", src: "BMET / RMMRU" },
+  { n: 35.6, decimals: 1, prefix: "$", suffix: "B", locale: "en-US", label: "remittance in FY2025-26, a record", src: "Bangladesh Bank via Prothom Alo" },
+  { n: 5.7, decimals: 1, suffix: "×", locale: "bn-BD", label: "up to this much: real Malaysia cost vs. the Tk 78,990 official limit", src: "Dhaka Tribune / Ministry" },
+  { n: 24, decimals: 0, suffix: "%", locale: "bn-BD", label: "of complainants with work permits actually got the job", src: "BMET arbitration study, TBS" },
 ];
 
-const STEPS = [
-  { t: "ছবি তুলুন বা বলুন", e: "Snap the visa, contract or WhatsApp offer, or just describe it by voice." },
-  { t: "এআই পড়ে ও যাচাই করে", e: "AI reads the document, our rule engine checks it against laws, official costs and the licence list." },
-  { t: "সবুজ / হলুদ / লাল", e: "You get a clear signal, the reasons in Bangla, and exactly what to do next." },
-  { t: "পরিবারকে পাঠান", e: "Share the report with your family so the decision isn't made alone." },
-];
+const SOURCES = ["BMET", "Ministry of Expatriates' Welfare", "ILO", "Bangladesh Bank", "RMMRU", "UN Special Rapporteurs"];
 
 const PLANS = [
   {
@@ -54,91 +52,78 @@ export default function Home() {
       <section className="hero">
         <div className="container hero-grid">
           <div>
-            <span className="badge">বিদেশে কাজ · Safe migration</span>
-            <h1 style={{ marginTop: 12 }}>
+            <span className="eyebrow">
+              <Seal size={22} tone="brand" /> বিদেশে কাজ · Safe migration
+            </span>
+            <h1 style={{ marginTop: 14 }}>
               টাকা দেওয়ার আগে <span>যাচাই করুন</span>
             </h1>
             <p className="hero-lead">
-              Probashi AI checks your overseas job offer, agency and price in plain Bangla <em>before</em> you hand over lakhs of taka to
-              a dalal.
-              <span className="en">AI safety copilot for Bangladeshi migrant workers and their families.</span>
+              বিদেশের চাকরির অফার, এজেন্সি আর খরচ: দালালকে লাখ টাকা দেওয়ার <em>আগেই</em> সহজ বাংলায় যাচাই করুন।
+              <span className="en">Check your overseas job offer, agency and price in plain Bangla before you pay a broker.</span>
             </p>
             <div className="row hero-cta">
-              <Link className="btn" href="/check">অফার চেক করুন (ফ্রি)</Link>
-              <Link className="btn btn-ghost" href="/ask">🎤 বাংলায় প্রশ্ন করুন</Link>
+              <Magnetic>
+                <Link className="btn btn-lg" href="/check">অফার চেক করুন (ফ্রি)</Link>
+              </Magnetic>
+              <Magnetic strength={0.15}>
+                <Link className="btn btn-ghost btn-lg" href="/ask">🎤 বাংলায় প্রশ্ন করুন</Link>
+              </Magnetic>
             </div>
             <div className="trust" aria-label="Why people trust it">
               <span>ফ্রি নিরাপত্তা যাচাই</span>
               <span>কাগজ সংরক্ষণ হয় না</span>
-              <span>Sources on every fact</span>
-              <span>Voice-first Bangla</span>
+              <span>প্রতিটি তথ্যের উৎস</span>
+              <span>বাংলায় কথা বলুন</span>
             </div>
             <LiveStats />
           </div>
-          <div className="phone" aria-label="Example result" role="img">
-            <div className="phone-screen">
-              <div className="small muted">অফার চেক · Saudi Arabia</div>
-              <div className="phone-row" style={{ marginTop: 10 }}>
-                <div className="ring sm" data-score="0" style={{ ["--v" as string]: 4 }} />
-                <div>
-                  <strong style={{ color: "var(--danger)", fontSize: "1.1rem" }}>বিপদ! টাকা দেবেন না</strong>
-                  <div className="small muted">Danger: 6 high-risk flags</div>
-                </div>
-              </div>
-              <div className="mini-flag">ফ্রি/আজাদ ভিসা: illegal in the Gulf</div>
-              <div className="mini-flag">খরচ সরকারি সীমার ৩.৯ গুণ</div>
-              <div className="mini-flag">টাকা দালালকে দেওয়া হচ্ছে</div>
-              <div className="mini-flag med">পাসপোর্ট দালালের কাছে</div>
-              <div className="btn btn-sm" style={{ width: "100%", marginTop: 12 }}>পরিবারকে পাঠান</div>
-            </div>
-          </div>
+          <HeroDemo />
+        </div>
+        <div className="container sources" aria-label="Data sources">
+          <span className="small muted">তথ্যের উৎস · Facts sourced from</span>
+          <ul>
+            {SOURCES.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      <section className="container" style={{ marginTop: -12, marginBottom: 24 }}>
+      <section className="container" style={{ marginTop: 8, marginBottom: 24 }}>
         <JourneyTeaser />
       </section>
 
       <section className="section section-alt" id="problem">
         <div className="container">
-          <h2>সমস্যা: যা কেউ সমাধান করেনি</h2>
+          <span className="eyebrow">সমস্যা · The problem</span>
+          <h2 style={{ marginTop: 10 }}>যা কেউ সমাধান করেনি</h2>
           <p style={{ maxWidth: 760 }}>
             প্রবাসীদের পাঠানো টাকায় দেশ চলে, অথচ বিদেশ যেতে আমাদের শ্রমিকরা দুনিয়ার সবচেয়ে বেশি খরচ দেন, যার বেশিরভাগ যায় দালালের পকেটে।
             সরকারি অ্যাপে রেজিস্ট্রেশন হয়, কিন্তু টাকা দেওয়ার আগে কেউ বলে দেয় না: <em>এই</em> অফার, <em>এই</em> দামে, আসল কি না।
             <span className="en">Workers pay some of the world&apos;s highest migration costs, mostly to middlemen. Nobody tells them, in their own language, whether this offer at this price is real.</span>
           </p>
-          <Reveal className="grid grid-4" delay={0.05}>
-            {STATS.map((s) => (
-              <div className="card" key={s.label}>
-                <div className="stat">{s.value}</div>
-                <div>{s.label}</div>
-                <div className="small muted">Source: {s.src}</div>
-              </div>
+          <div className="grid grid-4" style={{ marginTop: 20 }}>
+            {STATS.map((s, i) => (
+              <Reveal key={s.label} delay={0.06 * i}>
+                <Tilt className="card stat-card">
+                  <div className="stat">
+                    <CountUp to={s.n} decimals={s.decimals} prefix={s.prefix} suffix={s.suffix} locale={s.locale} />
+                  </div>
+                  <div>{s.label}</div>
+                  <div className="small muted">Source: {s.src}</div>
+                </Tilt>
+              </Reveal>
             ))}
-          </Reveal>
+          </div>
         </div>
       </section>
 
       <section className="section" id="how">
         <div className="container">
-          <h2>কীভাবে কাজ করে · How it works</h2>
-          <div className="grid grid-4" style={{ marginTop: 20 }}>
-            {STEPS.map((s, i) => (
-              <div className="card" key={s.t}>
-                <div className="badge">ধাপ {i + 1}</div>
-                <h3 style={{ marginTop: 10 }}>{s.t}</h3>
-                <p className="muted small">{s.e}</p>
-              </div>
-            ))}
-          </div>
-          <div className="card" style={{ marginTop: 20 }}>
-            <h3>Under the hood</h3>
-            <p className="muted small" style={{ margin: 0 }}>
-              <strong>Claude (Anthropic) vision AI</strong> reads visas, contracts and offer messages and writes the verdict in Bangla.
-              A <strong>transparent rule engine</strong> checks official cost ceilings, minimum wages, visa types, licence status and known
-              scam corridors. AI can add warnings but can never remove a rule-based one. Every fact shows its source.
-            </p>
-          </div>
+          <span className="eyebrow">কীভাবে কাজ করে · How it works</span>
+          <h2 style={{ marginTop: 10 }}>চার ধাপে, ২০ সেকেন্ডে</h2>
+          <HowItWorks />
         </div>
       </section>
 
@@ -219,7 +204,7 @@ export default function Home() {
           <p className="muted">One fake offer costs ৳4–9 lakh. A report costs less than a phone recharge.</p>
           <div className="grid grid-3" style={{ marginTop: 20 }}>
             {PLANS.map((p) => (
-              <div className={`card ${p.featured ? "plan-featured" : ""}`} key={p.name}>
+              <Tilt className={`card ${p.featured ? "plan-featured" : ""}`} key={p.name}>
                 {p.featured && <span className="badge">Most popular</span>}
                 <h3 style={{ marginTop: 8 }}>
                   {p.name}
@@ -235,7 +220,7 @@ export default function Home() {
                 <Link className={`btn ${p.featured ? "" : "btn-ghost"}`} href={p.href} style={{ width: "100%" }}>
                   {p.cta}
                 </Link>
-              </div>
+              </Tilt>
             ))}
           </div>
         </div>

@@ -25,8 +25,9 @@ export function Nav() {
       <div className="container nav-inner">
         <Link href="/" className="brand" aria-label="Probashi AI home">
           <span className="brand-mark" aria-hidden>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            <svg viewBox="0 0 64 64" width="22" height="22" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M32 6 L52 13 V30 C52 44 43 53 32 58 C21 53 12 44 12 30 V13 Z" strokeWidth="5" />
+              <path d="M23 32 L29.5 38.5 L42 25" strokeWidth="6" />
             </svg>
           </span>
           Probashi AI

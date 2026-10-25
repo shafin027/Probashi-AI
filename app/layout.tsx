@@ -7,9 +7,10 @@ import { Footer } from "@/components/Footer.tsx";
 import { FeaturesProvider } from "@/components/features.tsx";
 import { JourneyProvider } from "@/components/journey.tsx";
 
-// Self-hosted at build time: no third-party font requests, so the CSP can stay font-src 'self'.
-const body = Hind_Siliguri({ subsets: ["bengali", "latin"], weight: ["400", "500", "600", "700"], variable: "--font-hind", display: "swap" });
-const head = Noto_Serif_Bengali({ subsets: ["bengali", "latin"], weight: ["600", "700"], variable: "--font-serif-bn", display: "swap" });
+// Self-hosted at build time (no third-party requests, CSP stays font-src 'self'). display "optional": on slow
+// first visits the phone's own Bangla font is kept instead of swapping mid-read, which caused layout shift.
+const body = Hind_Siliguri({ subsets: ["bengali", "latin"], weight: ["400", "500", "600", "700"], variable: "--font-hind", display: "optional" });
+const head = Noto_Serif_Bengali({ subsets: ["bengali", "latin"], weight: ["600", "700"], variable: "--font-serif-bn", display: "optional" });
 
 export const metadata: Metadata = {
   title: "Probashi AI | Check before you pay",

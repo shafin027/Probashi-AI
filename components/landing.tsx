@@ -32,8 +32,10 @@ export function LiveStats() {
   useEffect(() => {
     fetch("/api/stats").then((r) => (r.ok ? r.json() : null)).then(setS).catch(() => {});
   }, []);
-  if (!s || !s.offersChecked) return null;
+  // Space is reserved before data arrives, so nothing below jumps (CLS).
+  if (!s || !s.offersChecked) return <div className="live-stats-slot" aria-hidden />;
   return (
+    <div className="live-stats-slot">
     <div className="live-stats" aria-live="polite">
       <span className="pulse-dot" aria-hidden />
       <span>
@@ -41,12 +43,14 @@ export function LiveStats() {
         <span className="small muted"> · live count, not a marketing number</span>
       </span>
     </div>
+    </div>
   );
 }
 
 export function JourneyTeaser() {
   const { progress, points, ready } = useJourney();
-  if (!ready) return null;
+  // Skeleton with the same footprint until local progress loads (no layout shift).
+  if (!ready) return <div className="card journey-teaser skeleton" aria-hidden />;
   const level = levelFor(points);
   const step = nextStep(progress);
   return (

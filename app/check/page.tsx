@@ -11,6 +11,7 @@ import { useJourney } from "@/components/journey.tsx";
 import { useFeatures } from "@/components/features.tsx";
 import { readTextOnDevice } from "@/components/ocr.ts";
 import { extractFacts } from "@/lib/extract.ts";
+import { Seal } from "@/components/premium/motion-bits.tsx";
 
 type Result = {
   score: number;
@@ -395,6 +396,16 @@ export default function CheckPage() {
         </div>
       </form>
 
+      {loading && (
+        <section className="stack" style={{ marginTop: 32 }} aria-hidden>
+          <div className="card skeleton" style={{ height: 140 }} />
+          <div className="grid grid-2">
+            <div className="card skeleton" style={{ height: 220 }} />
+            <div className="card skeleton" style={{ height: 220 }} />
+          </div>
+        </section>
+      )}
+
       {result && v && (
         <section id="result" className="stack" style={{ marginTop: 32 }}>
           <div className={`verdict verdict-${result.verdict}`}>
@@ -406,6 +417,7 @@ export default function CheckPage() {
                 aria-label={`Safety score ${result.score} out of 100`}
                 style={{ ["--v" as string]: Math.max(result.score, 3), ["--c" as string]: RING_COLOR[result.verdict] }}
               />
+              <Seal key={`${result.verdict}-${result.score}`} size={52} tone={result.verdict === "safe" ? "safe" : result.verdict === "caution" ? "caution" : "danger"} />
               <div style={{ flex: 1, minWidth: 200 }}>
                 <h2 id="verdict-title" tabIndex={-1} style={{ margin: 0 }}>{v.bn}</h2>
                 <div className="muted">{v.en}</div>

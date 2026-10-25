@@ -286,6 +286,18 @@ with sync_playwright() as p:
         check(not other, f"[{name}] no console errors or 5xx {other[:3]}")
         ctx.close()
 
+    # ---------- Reduced motion: every animated surface shows its final state ----------
+    rctx = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+    rp = rctx.new_page()
+    rp.goto(BASE + "/")
+    rp.wait_for_load_state("networkidle")
+    rp.wait_for_timeout(1500)
+    check(rp.locator(".demo-ring").get_attribute("data-score") == "4", "[reduced-motion] hero demo shows the final score, no animation")
+    check(all(rp.locator(".demo-flag").nth(i).is_visible() for i in range(4)), "[reduced-motion] all hero red flags visible")
+    check(rp.locator(".demo-verdict").is_visible(), "[reduced-motion] hero verdict visible")
+    check(rp.locator(".hiw-step").count() == 4 and all(rp.locator(".hiw-step").nth(i).is_visible() for i in range(4)), "[reduced-motion] all how-it-works steps visible")
+    rctx.close()
+
     # ---------- Free on-device OCR (Tesseract) when no cloud AI is configured ----------
     ctx = browser.new_context(viewport={"width": 1280, "height": 900})
     page = ctx.new_page()

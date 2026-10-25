@@ -91,6 +91,8 @@ Browser ──HTTPS──▶ Next.js on Vercel (proxy.ts: nonce CSP + security h
 | `npm run test:e2e` | Real Chromium, desktop + mobile (webapp-testing skill): **axe-core WCAG 2.2 AA scan of 10 pages**, offer-letter upload, OCR result, paid unlock, sign-up, memory-personalised chat, suggestion chips, **fake microphone → STT**, TTS playback, readiness milestones, full quiz round, progress sync to a second device, account deletion, **real Tesseract OCR on device**, no CSP violations or console errors, no horizontal scroll |
 | `npm run test:live` | **Real AI, no mocks**: OCR on generated English/Bangla offer letters (PNG + PDF), prompt-injection document, Bangla chat, TTS→STT voice round trip, account + memory personalisation |
 
+| `npm run test:perf` | Low-end phone budget (4× CPU slowdown, slow 4G, mobile): JS ≤ 450 KB, LCP ≤ 4 s, **CLS ≤ 0.1**, TBT ≤ 900 ms on /, /check, /journey, /ask |
+
 `npm run predeploy` runs all of them.
 
 ## Run locally
@@ -125,8 +127,9 @@ The footer on every page shows the "Built for YUNet AIgnite Buildathon 2026" wat
 |---|---|---|
 | **@lucasmarkes/hairline** | ✅ Used | Zero-dependency MIT interactive line figures. Vault (trust), Elevator (readiness levels), Loupe (quiz), themed to the palette, reduced-motion safe |
 | **motion-dev-animations** skill + `motion` | ✅ Used | Reveal/stagger/spring timings, AnimatePresence for quiz cards and toasts, `useReducedMotion` everywhere |
-| **greensock/gsap-skills** | ⚖️ Read, not added | Excellent, but a second animation runtime would duplicate Motion and add bundle weight; Motion covers our needs |
-| **freshtechbro/claudedesignskills** | ⚖️ Read | Mostly 3D/WebGL/Lottie skills; heavy 3D would hurt cheap Android phones on mobile data |
+| **greensock/gsap-skills** | ✅ Used on the landing page | `gsap-react` (useGSAP, scoped cleanup), `gsap-timeline` (hero offer-scan story), `gsap-scrolltrigger` (scroll progress, CSS sticky instead of pin to avoid layout shift), `gsap-performance` (transform/opacity only, pause off-screen); loaded only on the landing page |
+| **freshtechbro/claudedesignskills** | ✅ Patterns used | `motion-framer` and `lightweight-3d-effects` patterns (magnetic CTA, card tilt) built with Motion transforms instead of extra libraries; heavy WebGL/Three.js deliberately left out for low-end phones |
+| **affaan-m/ECC frontend-design-direction** | ✅ Used | Design contract, all six content states, and the evidence gate: `docs/design-evidence/report.json` passes its `check-evidence.js` checker |
 | **sickn33/agentic-awesome-skills** | ✅ Used selectively | `design-ux` (Nielsen audit by an independent judge), `onboarding-psychologist` (ethical habit design), `frontend-design`, `price-psychology-strategist`, `llm-app-security` |
 | **affaan-m/ECC** | ✅ Used selectively | `accessibility` (WCAG 2.2 AA, enforced with axe-core in E2E), `security-review` |
 | **baidu/Unlimited-OCR** | ❌ Not suitable | Needs an NVIDIA GPU (CUDA/vLLM), so it can't run on Vercel; no documented Bangla. Claude/GPT vision already read Bangla, and Tesseract (Bangla) is the free fallback |
