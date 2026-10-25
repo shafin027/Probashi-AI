@@ -7,12 +7,25 @@ natural voice (fake microphone -> STT, TTS playback), account deletion, and
 fails on any CSP violation or console error.
 """
 
+import json
 import os
+import subprocess
 import sys
 import time
 from playwright.sync_api import sync_playwright
 
 BASE = os.environ.get("BASE_URL", "http://localhost:3300")
+NO_AI = os.environ.get("NO_AI_URL", "http://localhost:3301")
+HERE = os.path.dirname(os.path.abspath(__file__))
+AXE = os.path.join(HERE, "..", "node_modules", "axe-core", "axe.min.js")
+PAGES = ["/", "/check", "/cost", "/agency", "/ask", "/plan", "/quiz", "/journey", "/login", "/privacy"]
+
+# Ground truth for the quiz, read from the app's own data (not from the page).
+SCENARIOS = json.loads(subprocess.check_output(
+    ["node", "--experimental-strip-types", "--no-warnings", "-e", "import('./lib/quiz.ts').then(m=>console.log(JSON.stringify(m.SCENARIOS)))"],
+    cwd=os.path.join(HERE, ".."),
+))
+SCAM_BY_TEXT = {s["bn"]: s["scam"] for s in SCENARIOS}
 SHOTS = os.path.join(os.path.dirname(__file__), "screenshots")
 os.makedirs(SHOTS, exist_ok=True)
 CHROMIUM = "/opt/pw-browsers/chromium"
@@ -27,11 +40,12 @@ def check(cond, msg):
 
 
 def make_offer_letter(path):
-    """Render a realistic offer letter image to upload (exercises the OCR path)."""
-    from PIL import Image, ImageDraw
+    """Render a realistic offer letter photo to upload (exercises cloud and on-device OCR)."""
+    from PIL import Image, ImageDraw, ImageFont
 
-    img = Image.new("RGB", (1000, 700), "white")
+    img = Image.new("RGB", (1400, 900), "white")
     d = ImageDraw.Draw(img)
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 30)
     lines = [
         "AL NOOR CLEANING CO. - RIYADH, KINGDOM OF SAUDI ARABIA",
         "EMPLOYMENT OFFER LETTER",
@@ -39,10 +53,27 @@ def make_offer_letter(path):
         "Position: Cleaner        Monthly salary: SAR 1200",
         "Contract: 24 months      Visa type: Work (Iqama by employer)",
         "Recruiting agent fee payable in Bangladesh: BDT 650,000",
+        "Visa: FREE VISA - no sponsor needed, pay advance to Mr. Kalam",
     ]
     for i, line in enumerate(lines):
-        d.text((40, 60 + i * 80), line, fill="black")
+        d.text((50, 70 + i * 105), line, fill="black", font=font)
     img.save(path)
+
+
+def axe_scan(browser, viewport, label):
+    """WCAG 2.2 AA scan of every page with axe-core (accessibility skill). CSP bypass is for the injected scanner only."""
+    ctx = browser.new_context(viewport=viewport, bypass_csp=True)
+    page = ctx.new_page()
+    for path in PAGES:
+        page.goto(BASE + path)
+        page.wait_for_load_state("networkidle")
+        page.add_script_tag(path=AXE)
+        res = page.evaluate("""async () => {
+          const r = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa'] } });
+          return r.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => ({ id: v.id, impact: v.impact, n: v.nodes.length, target: v.nodes[0]?.target?.join(' ') }));
+        }""")
+        check(not res, f"[{label}] axe WCAG AA: no serious/critical issues on {path} {res[:3]}")
+    ctx.close()
 
 
 with sync_playwright() as p:
@@ -55,6 +86,7 @@ with sync_playwright() as p:
     make_offer_letter(letter)
 
     for name, viewport in [("desktop", {"width": 1280, "height": 900}), ("mobile", {"width": 390, "height": 844})]:
+        axe_scan(browser, viewport, name)
         ctx = browser.new_context(viewport=viewport, permissions=["microphone"])
         page = ctx.new_page()
         problems = []
@@ -111,6 +143,8 @@ with sync_playwright() as p:
         page.get_by_label("কত টাকা চাইছে? (৳)").fill("650000")
         page.get_by_role("button", name="Check now").click()
         page.wait_for_selector("#result", timeout=60000)
+        page.wait_for_selector(".toast >> text=অফার যাচাই করেছেন", timeout=5000)
+        check(True, f"[{name}] milestone celebration toast shown")
         result = page.locator("#result").inner_text()
         check("বিপদ" in result, f"[{name}] uploaded offer flagged as danger")
         check("AI document reading" in result, f"[{name}] AI read the uploaded document")
@@ -122,6 +156,8 @@ with sync_playwright() as p:
         page.get_by_role("button", name="Pay ৳299 (demo)").click()
         page.wait_for_selector("text=SECRET_NEGOTIATION_SCRIPT", timeout=15000)
         check(True, f"[{name}] paid report unlocks after checkout")
+        saved = page.evaluate("localStorage.getItem('pa-journey-v1') || ''")
+        check("checked_offer" in saved, f"[{name}] checking an offer completes the first milestone")
 
         # ---------- Chat: memory + suggestions ----------
         page.goto(f"{BASE}/ask")
@@ -158,6 +194,57 @@ with sync_playwright() as p:
             check(marker in page.content(), f"[{name}] {path} renders")
             check(page.evaluate("document.documentElement.scrollWidth") <= viewport["width"] + 1, f"[{name}] no horizontal scroll on {path}")
 
+        # ---------- Gamification: journey + quiz + manual step ----------
+        page.goto(f"{BASE}/journey")
+        page.wait_for_load_state("networkidle")
+        check(page.locator(".milestone.done").count() >= 2, f"[{name}] completed milestones shown on journey")
+        start_pts = int(page.locator(".ring.lg").get_attribute("data-score"))
+        check(start_pts >= 20, f"[{name}] readiness points earned from real actions ({start_pts})")
+        page.goto(f"{BASE}/quiz")
+        page.wait_for_selector(".quiz-q")
+        prev = ""
+        for _ in range(6):
+            for _ in range(60):  # poll: the strict CSP forbids eval-based waits
+                if page.locator(".quiz-q").count() == 1 and page.locator(".quiz-q").inner_text().strip() != prev:
+                    break
+                page.wait_for_timeout(100)
+            q = page.locator(".quiz-q").inner_text().strip()
+            prev = q
+            scam = SCAM_BY_TEXT.get(q)
+            check(scam is not None, f"[{name}] quiz question is a known scenario")
+            page.get_by_role("button", name="প্রতারণা" if scam else "নিরাপদ").first.click()
+            page.wait_for_selector("text=ঠিক! Correct.")
+            page.locator(".quiz-card .verdict .btn").click()
+        page.wait_for_selector("text=6/6 সঠিক")
+        check(True, f"[{name}] quiz completes with 100% when answered correctly")
+        page.goto(f"{BASE}/journey")
+        page.wait_for_load_state("networkidle")
+        page.get_by_role("button", name="✓ আমি করেছি").first.click()
+        page.wait_for_timeout(400)
+        end_pts = int(page.locator(".ring.lg").get_attribute("data-score"))
+        check(end_pts >= start_pts + 20, f"[{name}] quiz + manual step raise readiness ({start_pts} -> {end_pts})")
+        page.screenshot(path=f"{SHOTS}/{name}-journey.png", full_page=True)
+
+        # Progress follows the account to a new device.
+        other = browser.new_context(viewport=viewport)
+        op = other.new_page()
+        op.goto(f"{BASE}/login")
+        op.wait_for_load_state("networkidle")
+        op.get_by_label("মোবাইল নম্বর · Mobile").fill(phone)
+        op.locator("#password").fill("Probash!2026")
+        op.get_by_role("button", name="লগইন করুন").click()
+        op.wait_for_url("**/ask", timeout=20000)
+        op.goto(f"{BASE}/journey")
+        op.wait_for_selector(".ring.lg")
+        synced = 0
+        for _ in range(100):
+            synced = int(op.locator(".ring.lg").get_attribute("data-score") or 0)
+            if synced >= end_pts:
+                break
+            op.wait_for_timeout(150)
+        check(synced >= end_pts, f"[{name}] readiness synced to a second device via the account ({synced})")
+        other.close()
+
         # ---------- Account: memories visible, then delete ----------
         page.goto(f"{BASE}/account")
         page.wait_for_selector(".memory-item", timeout=15000)
@@ -175,6 +262,28 @@ with sync_playwright() as p:
         other = [e for e in problems if e not in csp and "favicon" not in e]
         check(not other, f"[{name}] no console errors or 5xx {other[:3]}")
         ctx.close()
+
+    # ---------- Free on-device OCR (Tesseract) when no cloud AI is configured ----------
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    page = ctx.new_page()
+    problems = []
+    page.on("console", lambda m: problems.append(m.text) if m.type == "error" else None)
+    page.goto(f"{NO_AI}/check")
+    page.wait_for_load_state("networkidle")
+    page.locator("#doc").set_input_files(letter)
+    page.wait_for_selector("img[alt='Uploaded document']")
+    page.get_by_role("button", name="Check now").click()
+    page.wait_for_selector("#result", timeout=180000)
+    text = page.locator("#offerText").input_value()
+    check("SAR" in text and "1200" in text, f"[ocr] Tesseract read salary from the photo on-device: {text[:80]!r}")
+    check("FREE VISA" in text.upper(), "[ocr] Tesseract read the visa line")
+    check(page.locator(".flag", has_text="Free / azad visa").count() == 1, "[ocr] on-device text fed the rule engine (free visa flagged)")
+    check("Rule engine only" in page.locator("#result").inner_text(), "[ocr] no cloud AI was used")
+    ocr_reqs = []
+    page.on("request", lambda r: ocr_reqs.append(r.url))
+    check(not [e for e in problems if "Content Security Policy" in e or "Refused" in e], f"[ocr] OCR worker runs under the strict CSP {problems[:2]}")
+    page.screenshot(path=f"{SHOTS}/ocr-on-device.png", full_page=True)
+    ctx.close()
 
     browser.close()
 

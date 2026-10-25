@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { COUNTRIES } from "@/lib/data/countries.ts";
+import { useJourney } from "@/components/journey.tsx";
 
 const fmt = (n: number) => `৳${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -13,6 +14,16 @@ export default function CostPage() {
   const [living, setLiving] = useState("400");
   const [loanRate, setLoanRate] = useState("36");
   const [months, setMonths] = useState("24");
+  const { complete } = useJourney();
+  const touched = useRef(false);
+  const inputs = `${code}|${asked}|${salary}|${living}|${loanRate}|${months}`;
+  const first = useRef(inputs);
+  useEffect(() => {
+    if (inputs === first.current || touched.current) return;
+    touched.current = true;
+    const t = setTimeout(() => complete("true_cost"), 800);
+    return () => clearTimeout(t);
+  }, [inputs, complete]);
 
   const c = COUNTRIES.find((x) => x.code === code)!;
   const askedN = Number(asked) || 0;

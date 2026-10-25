@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SpeakButton, VoiceButton } from "@/components/voice.tsx";
 import { useFeatures } from "@/components/features.tsx";
+import { useJourney } from "@/components/journey.tsx";
 
 type Msg = { role: "user" | "assistant"; content: string; personalised?: boolean };
 
@@ -17,6 +18,7 @@ const STARTERS = [
 
 export default function AskPage() {
   const { me, accounts, naturalVoice } = useFeatures();
+  const { complete } = useJourney();
   const greeting = me
     ? `আবার স্বাগতম, ${me.name.split(" ")[0]}! আগের কথাগুলো আমার মনে আছে। আজ কী নিয়ে সাহায্য করতে পারি?`
     : "আসসালামু আলাইকুম! বিদেশে কাজ, খরচ, ভিসা বা বিপদ নিয়ে যেকোনো প্রশ্ন বাংলায় লিখুন বা মাইকে বলুন।";
@@ -50,6 +52,7 @@ export default function AskPage() {
         body: JSON.stringify({ messages: next.slice(-12).map(({ role, content }) => ({ role, content })) }),
       });
       const json = await res.json();
+      complete("asked_question");
       setMessages([...next, { role: "assistant", content: json.answer ?? json.error ?? "দুঃখিত, আবার চেষ্টা করুন।", personalised: json.personalised }]);
       setSuggestions(json.suggestions?.length ? json.suggestions : STARTERS.slice(0, 3));
       setNotice(json.mode === "offline" ? json.notice ?? "Offline mode: answers come from our built-in guide." : "");

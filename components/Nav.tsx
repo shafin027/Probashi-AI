@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useFeatures } from "./features.tsx";
+import { ReadinessRing, useJourney } from "./journey.tsx";
 
 const LINKS = [
   { href: "/check", label: "অফার চেক", en: "Offer check" },
@@ -11,12 +12,14 @@ const LINKS = [
   { href: "/agency", label: "এজেন্সি যাচাই", en: "Agencies" },
   { href: "/ask", label: "প্রশ্ন করুন", en: "Ask" },
   { href: "/plan", label: "পরিবার ও টাকা", en: "Family" },
+  { href: "/quiz", label: "কুইজ", en: "Scam quiz" },
 ];
 
 export function Nav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { me, accounts } = useFeatures();
+  const { points, ready } = useJourney();
   useEffect(() => setOpen(false), [pathname]);
 
   return (
@@ -52,6 +55,12 @@ export function Nav() {
               <span className="nav-en">{l.en}</span>
             </Link>
           ))}
+          <Link href="/journey" className="nav-journey" aria-current={pathname === "/journey" ? "page" : undefined}>
+            {ready && <ReadinessRing points={points} />}
+            প্রস্তুতি
+            <span className="sr-only"> {points}/100</span>
+            <span className="nav-en">Readiness {points}/100</span>
+          </Link>
           {accounts &&
             (me ? (
               <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className="nav-user">

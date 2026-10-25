@@ -7,6 +7,9 @@ import type { Analysis } from "@/lib/prompts.ts";
 import type { Agency } from "@/lib/data/agencies.ts";
 import { SpeakButton, VoiceButton } from "@/components/voice.tsx";
 import { PayModal } from "@/components/PayModal.tsx";
+import { useJourney } from "@/components/journey.tsx";
+import { useFeatures } from "@/components/features.tsx";
+import { readTextOnDevice } from "@/components/ocr.ts";
 
 type Result = {
   score: number;
@@ -105,6 +108,27 @@ export default function CheckPage() {
   const [premium, setPremium] = useState<Premium | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [stage, setStage] = useState(0);
+  const [ocr, setOcr] = useState<{ busy: boolean; pct: number; note: string }>({ busy: false, pct: 0, note: "" });
+  const { complete } = useJourney();
+  const { ai: aiAvailable } = useFeatures();
+
+  /** Reads text from the photo on this phone (Tesseract, Bangla + English). Returns the text. */
+  async function runOcr(): Promise<string> {
+    if (!doc?.preview) return "";
+    setOcr({ busy: true, pct: 0, note: "" });
+    try {
+      const { text, confidence } = await readTextOnDevice(doc.preview, (f, status) => {
+        if (status.includes("recogniz")) setOcr((o) => ({ ...o, pct: Math.round(f * 100) }));
+      });
+      const clean = text.slice(0, 3000);
+      if (clean) setOfferText((p) => (p ? `${p}\n\n${clean}` : clean));
+      setOcr({ busy: false, pct: 100, note: clean ? `ফোনেই ${clean.length} অক্ষর পড়া হয়েছে (confidence ${Math.round(confidence)}%). Check and correct the text below.` : "No readable text found in this photo." });
+      return clean;
+    } catch {
+      setOcr({ busy: false, pct: 0, note: "On-device reading isn't supported on this browser." });
+      return "";
+    }
+  }
 
   useEffect(() => {
     if (!loading) return;
@@ -152,6 +176,9 @@ export default function CheckPage() {
     setResult(null);
     setPremium(null);
     try {
+      // Without cloud AI, read the photo on the device so the rule engine still sees its text.
+      let text = offerText;
+      if (!aiAvailable && doc?.preview && !offerText.trim()) text = await runOcr();
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -162,7 +189,7 @@ export default function CheckPage() {
             salaryLocal: salaryLocal ? Number(salaryLocal) : undefined,
             askedCostBdt: askedCostBdt ? Number(askedCostBdt) : undefined,
             agencyQuery: agencyQuery || undefined,
-            offerText: offerText || undefined,
+            offerText: text || undefined,
             visaType,
             paidTo,
             receipt: tri(receipt),
@@ -170,12 +197,15 @@ export default function CheckPage() {
             foundVia,
             passportHandedOver: tri(passport),
           },
-          doc: doc ? { mediaType: doc.mediaType, data: doc.data } : undefined,
+          // Only upload the document when cloud AI can read it.
+          doc: doc && aiAvailable ? { mediaType: doc.mediaType, data: doc.data } : undefined,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
       setResult(json);
+      complete("checked_offer");
+      if (json.agency) complete("verified_agency");
       setTimeout(() => document.getElementById("result")?.scrollIntoView({ behavior: "smooth" }), 50);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -219,10 +249,23 @@ export default function CheckPage() {
           </label>
           <input id="doc" type="file" accept="image/*,application/pdf" capture="environment" onChange={onFile} style={{ display: "none" }} />
           {doc && (
-            <button type="button" className="btn btn-ghost small" onClick={() => setDoc(null)} style={{ marginTop: 8 }}>
-              Remove file
-            </button>
+            <div className="row" style={{ marginTop: 8, gap: 8 }}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDoc(null); setOcr({ busy: false, pct: 0, note: "" }); }}>
+                Remove file
+              </button>
+              {doc.preview && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void runOcr()} disabled={ocr.busy}>
+                  {ocr.busy ? `📖 পড়া হচ্ছে… ${ocr.pct}%` : "📖 ফোনেই লেখা পড়ুন · Read text on this phone"}
+                </button>
+              )}
+            </div>
           )}
+          {ocr.busy && (
+            <div className="meter" style={{ marginTop: 8 }} role="progressbar" aria-label="Reading text on device" aria-valuenow={ocr.pct} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ width: `${Math.max(ocr.pct, 4)}%` }} />
+            </div>
+          )}
+          {ocr.note && <p className="small muted" role="status" style={{ marginTop: 6 }}>{ocr.note}</p>}
           <div className="field" style={{ marginTop: 16 }}>
             <label htmlFor="offerText">দালাল/এজেন্সি কী বলেছে? · What were you told?</label>
             <textarea

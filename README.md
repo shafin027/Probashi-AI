@@ -23,13 +23,23 @@ Built for **YUNet AIgnite Buildathon 2026**.
 | `/login`, `/account` **Accounts + memory** | Phone + password accounts; a **pgvector memory** of each user's checks and questions, recalled by meaning to personalise answers; view/forget memories, turn memory off, delete account | OpenAI embeddings |
 | `/privacy` | What is stored and how it is protected | — |
 | `/plan` **Family & Money Plan** | Formal remittance vs. hundi, debt payoff, savings goal, family document checklist | — |
-| `/` Landing | Problem, how it works, **"why" FAQ**, pricing, business model and checks and balances, scale story, **buildathon watermark** | — |
+| `/journey` **Safe Migration Readiness** | Gamified 0–100 readiness score from 10 real safety steps, 4 levels, celebrations, a "next step" prompt, emergency contact card, family share; synced to the account | — |
+| `/quiz` **Scam Spotter** | 6 random real-world scenarios per round with explanations; 80%+ earns the step | — |
+| On-device OCR | Free open-source **Tesseract** (Bangla + English) reads photos *on the phone* when cloud AI is unavailable, or on request for privacy; self-hosted, CSP-safe | — |
+| `/` Landing | Problem, how it works, live real-usage counter, readiness teaser, trust section (Hairline vault), quiz teaser, **"why" FAQ**, pricing, business model and checks and balances, scale story, **buildathon watermark** | — |
 
 ### Trust by design
 - A **deterministic rule engine** (`lib/rules.ts`) owns the verdict: official cost ceilings, minimum wages, free or visit visas, licence status, paying a dalal, no receipt, no BMET clearance, scam corridors (Russia, Libya, Myanmar/Cambodia scam compounds).
 - **AI can add warnings but can never remove a rule-based flag.**
 - Every figure carries its source (`lib/data/countries.ts`).
-- Works without an API key: rules-only mode plus an offline FAQ.
+- Works without an API key: rules-only mode, on-device OCR and an offline FAQ.
+
+### Ethical gamification
+Built with the *onboarding-psychologist* skill's rule for high-stakes products: **"optimize for confidence and reassurance, not streak pressure"** and **"build habits through value, not addiction mechanics."**
+- Points only for actions that protect the worker (verify agency, know the official cost, BMET registration, documents with family…). Nothing for time spent.
+- No streaks, no countdowns, no fake scarcity, no invented testimonials. The live counter shows real database counts or nothing.
+- Variable reward done honestly: each quiz round is a fresh mix of real scam patterns, and always includes a "safe" example so users learn what good looks like.
+- Progress never decreases. The server only merges (union), so a bad client can't erase it.
 
 ## Business model
 
@@ -78,7 +88,7 @@ Browser ──HTTPS──▶ Next.js on Vercel (proxy.ts: nonce CSP + security h
 | `npm run lint` | TypeScript strict typecheck |
 | `npm test` | Rule-engine unit tests |
 | `npm run test:integration` | **43 tests** on a production build with a recording mock AI: headers/CSP, origin/size/type guards, disguised and malicious uploads, Claude + OpenAI request shapes (image/PDF OCR blocks, schemas, fallbacks), refusal/bad-JSON/500 fallbacks, sealed report + tampering, accounts, cookie flags, brute-force throttling, vector-memory ranking, memory erase, account deletion, STT/TTS, rate limits, no secrets in the bundle |
-| `npm run test:e2e` | Real Chromium, desktop + mobile (webapp-testing skill): offer-letter upload, OCR result, paid unlock, sign-up, memory-personalised chat, suggestion chips, **fake microphone → STT**, TTS playback, account deletion, no CSP violations or console errors, no horizontal scroll |
+| `npm run test:e2e` | Real Chromium, desktop + mobile (webapp-testing skill): **axe-core WCAG 2.2 AA scan of 10 pages**, offer-letter upload, OCR result, paid unlock, sign-up, memory-personalised chat, suggestion chips, **fake microphone → STT**, TTS playback, readiness milestones, full quiz round, progress sync to a second device, account deletion, **real Tesseract OCR on device**, no CSP violations or console errors, no horizontal scroll |
 | `npm run test:live` | **Real AI, no mocks**: OCR on generated English/Bangla offer letters (PNG + PDF), prompt-injection document, Bangla chat, TTS→STT voice round trip, account + memory personalisation |
 
 `npm run predeploy` runs all of them.
@@ -108,6 +118,22 @@ The footer on every page shows the "Built for YUNet AIgnite Buildathon 2026" wat
 ## Pitch deck
 
 `pitch/Probashi-AI-Pitch.pptx` is the 5-slide deck: problem, solution, how it works, business, team and roadmap. Speaker notes are included. To regenerate it, run `pitch/build-deck.js` (it needs `pptxgenjs`, `react-icons`, `react`, `react-dom` and `sharp`). **Edit slide 5** with your full name, photo and live URL before submitting.
+
+## Tools evaluated for this version
+
+| Tool | Verdict | Why |
+|---|---|---|
+| **@lucasmarkes/hairline** | ✅ Used | Zero-dependency MIT interactive line figures. Vault (trust), Elevator (readiness levels), Loupe (quiz), themed to the palette, reduced-motion safe |
+| **motion-dev-animations** skill + `motion` | ✅ Used | Reveal/stagger/spring timings, AnimatePresence for quiz cards and toasts, `useReducedMotion` everywhere |
+| **greensock/gsap-skills** | ⚖️ Read, not added | Excellent, but a second animation runtime would duplicate Motion and add bundle weight; Motion covers our needs |
+| **freshtechbro/claudedesignskills** | ⚖️ Read | Mostly 3D/WebGL/Lottie skills; heavy 3D would hurt cheap Android phones on mobile data |
+| **sickn33/agentic-awesome-skills** | ✅ Used selectively | `design-ux` (Nielsen audit by an independent judge), `onboarding-psychologist` (ethical habit design), `frontend-design`, `price-psychology-strategist`, `llm-app-security` |
+| **affaan-m/ECC** | ✅ Used selectively | `accessibility` (WCAG 2.2 AA, enforced with axe-core in E2E), `security-review` |
+| **baidu/Unlimited-OCR** | ❌ Not suitable | Needs an NVIDIA GPU (CUDA/vLLM), so it can't run on Vercel; no documented Bangla. Claude/GPT vision already read Bangla, and Tesseract (Bangla) is the free fallback |
+| **pocketbase** | ❌ Not needed | Separate always-on Go server; we already have tested Postgres auth + pgvector on Vercel |
+| **infiniflow/ragflow** | ❌ Not needed | Heavy RAG server (Docker, Elasticsearch); per-user pgvector memory covers our retrieval |
+| **Graphify-Labs/graphify** | ❌ Not for the app | Code knowledge-graph tool for developers, not a product feature |
+| **snarktank/ralph**, **ruvnet/ruflo** | ❌ Not for the app | Agent-orchestration harnesses for running coding agents; no user-facing value |
 
 ## Skills used
 

@@ -34,7 +34,27 @@ CREATE TABLE IF NOT EXISTS memories (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS memories_user_idx ON memories(user_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS progress (
+  user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  data jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS stats (
+  key text PRIMARY KEY,
+  value bigint NOT NULL DEFAULT 0
+);
 `;
+
+/** Increments a public counter (real usage numbers only; never seeded or inflated). */
+export async function bumpStat(key: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.query("INSERT INTO stats (key, value) VALUES ($1, 1) ON CONFLICT (key) DO UPDATE SET value = stats.value + 1", [key]);
+  } catch {
+    // counters are best-effort
+  }
+}
 
 let ready: Promise<Querier | null> | null = null;
 

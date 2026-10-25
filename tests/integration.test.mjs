@@ -410,3 +410,39 @@ test("no secrets or server-only code in the browser bundle or pages", async () =
   const html = await (await fetch(`${A}/`)).text();
   for (const b of banned) assert.ok(!b.test(html), `${b} found in HTML`);
 });
+
+describe("gamified progress + real stats", () => {
+  test("progress requires login and origin", async () => {
+    assert.equal((await call(A, "/api/progress", { method: "GET" })).status, 401);
+    const r = await call(A, "/api/auth/register", { body: { phone: "01511" + String(Date.now()).slice(-6), name: "Progress Tester", password: "Probash!2026" } });
+    const cookie = cookieFrom(r);
+    assert.equal((await call(A, "/api/progress", { method: "PUT", cookie, body: { done: ["checked_offer"] }, origin: "https://evil.example" })).status, 403);
+  });
+
+  test("progress merges, ignores junk, never loses milestones", async () => {
+    const r = await call(A, "/api/auth/register", { body: { phone: "01411" + String(Date.now()).slice(-6), name: "Merge Tester", password: "Probash!2026" } });
+    const cookie = cookieFrom(r);
+    const a = await call(A, "/api/progress", { method: "PUT", cookie, body: { done: ["checked_offer", "hack_points", "checked_offer"], quizBest: 50 } });
+    assert.equal(a.status, 200, a.text);
+    assert.deepEqual(a.json.progress.done, ["checked_offer"]);
+    const b = await call(A, "/api/progress", { method: "PUT", cookie, body: { done: ["true_cost"], quizBest: 999 } });
+    assert.deepEqual(b.json.progress.done.sort(), ["checked_offer", "true_cost"]);
+    assert.equal(b.json.progress.quizBest, 100);
+    const c = await call(A, "/api/progress", { method: "PUT", cookie, body: { done: [] , quizBest: 10 } });
+    assert.equal(c.json.progress.done.length, 2, "empty update cannot erase progress");
+    assert.equal(c.json.progress.quizBest, 100);
+    const g = await call(A, "/api/progress", { method: "GET", cookie });
+    assert.equal(g.json.progress.done.length, 2);
+    assert.equal((await call(A, "/api/progress", { method: "PUT", cookie, raw: "x".repeat(10000), headers: { "content-type": "application/json" } })).status, 413);
+  });
+
+  test("stats count real checks only and are public read-only", async () => {
+    const before = (await call(A, "/api/stats", { method: "GET" })).json.offersChecked;
+    await call(A, "/api/analyze", { body: { input: { countryCode: "SA", offerText: "free visa" } } });
+    const after = (await call(A, "/api/stats", { method: "GET" })).json;
+    assert.equal(after.offersChecked, before + 1);
+    assert.ok(after.dangersFlagged >= 1);
+    assert.equal((await call(A, "/api/stats", { body: {} })).status, 405);
+    assert.deepEqual((await call(C, "/api/stats", { method: "GET" })).json, { offersChecked: null, dangersFlagged: null });
+  });
+});

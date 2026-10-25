@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WHY_FAQ } from "@/lib/faq.ts";
+import { JourneyTeaser, LiveStats, Reveal, TrustFigure } from "@/components/landing.tsx";
 
 const STATS = [
   { value: "11.3 লাখ", label: "people went abroad for work in 2025", src: "BMET / RMMRU" },
@@ -80,6 +81,7 @@ export default function Home() {
               <span>Sources on every fact</span>
               <span>Voice-first Bangla</span>
             </div>
+            <LiveStats />
           </div>
           <div className="phone" aria-label="Example result" role="img">
             <div className="phone-screen">
@@ -101,6 +103,10 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="container" style={{ marginTop: -12, marginBottom: 24 }}>
+        <JourneyTeaser />
+      </section>
+
       <section className="section section-alt" id="problem">
         <div className="container">
           <h2>সমস্যা: The problem nobody has solved</h2>
@@ -109,7 +115,7 @@ export default function Home() {
             Government apps handle registration. Nobody tells the worker, in their own language, whether <em>this</em> offer at <em>this</em>{" "}
             price is real.
           </p>
-          <div className="grid grid-4" style={{ marginTop: 20 }}>
+          <Reveal className="grid grid-4" delay={0.05}>
             {STATS.map((s) => (
               <div className="card" key={s.label}>
                 <div className="stat">{s.value}</div>
@@ -117,7 +123,7 @@ export default function Home() {
                 <div className="small muted">Source: {s.src}</div>
               </div>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -159,6 +165,39 @@ export default function Home() {
               </details>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="section" id="trust">
+        <div className="container trust-grid">
+          <Reveal>
+            <span className="badge">বিশ্বাস ও নিরাপত্তা · Trust</span>
+            <h2 style={{ marginTop: 10 }}>আপনার কাগজ, আপনার টাকা: তালাবদ্ধ</h2>
+            <ul className="trust-list">
+              <li><strong>কাগজ সংরক্ষণ হয় না।</strong> Documents are used once for your check, then discarded. Agencies never see them.</li>
+              <li><strong>স্কোর কেনা যায় না।</strong> Risk comes from laws, licences and documents. Sponsored agencies are labelled and can&apos;t change scores.</li>
+              <li><strong>প্রতিটি তথ্যের উৎস।</strong> Every cost limit and warning shows where it comes from (BMET, Ministry, ILO, news).</li>
+              <li><strong>ব্যাংক-মানের সুরক্ষা।</strong> HTTPS, strict CSP, encrypted reports, hashed passwords, delete-my-data anytime.</li>
+              <li><strong>আমরা কীভাবে আয় করি, খোলাখুলি।</strong> Free safety checks forever; we earn from optional reports and clearly disclosed partners.</li>
+            </ul>
+            <a className="btn btn-ghost" href="/privacy">কীভাবে সুরক্ষিত রাখি · How we protect you →</a>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <TrustFigure kind="vault" />
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="section section-alt" id="quiz-teaser">
+        <div className="container">
+          <Reveal className="card quiz-teaser">
+            <div style={{ fontSize: "2.4rem" }} aria-hidden>🕵️</div>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <h3 style={{ margin: 0 }}>দালালের ফাঁদ চিনতে পারবেন? · Can you spot the scam?</h3>
+              <p className="muted small" style={{ margin: "4px 0 0" }}>6 real situations, 2 minutes. Different every time. Score 80% to earn your Scam Spotter badge.</p>
+            </div>
+            <Link className="btn btn-accent" href="/quiz">কুইজ খেলুন →</Link>
+          </Reveal>
         </div>
       </section>
 

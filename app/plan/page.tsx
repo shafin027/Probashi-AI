@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useJourney } from "@/components/journey.tsx";
 
 const fmt = (n: number) => `৳${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -21,6 +22,16 @@ export default function PlanPage() {
   const [goal, setGoal] = useState("300000");
   const [hundiBonus, setHundiBonus] = useState("1.5");
   const [checked, setChecked] = useState<Record<number, boolean>>({});
+  const { complete } = useJourney();
+  const inputs = `${monthly}|${debt}|${family}|${goal}|${hundiBonus}`;
+  const first = useRef(inputs);
+  useEffect(() => {
+    if (inputs !== first.current) complete("remittance_plan");
+  }, [inputs, complete]);
+  const docsReady = Object.values(checked).filter(Boolean).length;
+  useEffect(() => {
+    if (docsReady >= 5) complete("family_docs");
+  }, [docsReady, complete]);
 
   const m = Number(monthly) || 0;
   const fam = Number(family) || 0;
@@ -91,7 +102,7 @@ export default function PlanPage() {
           </div>
         </div>
       </div>
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card" id="docs" style={{ marginTop: 16 }}>
         <h3>📁 পরিবারের কাছে যা রাখবেন · Family document checklist</h3>
         <div className="grid grid-2" style={{ gap: 8 }}>
           {CHECKLIST.map((c, i) => (

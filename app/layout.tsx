@@ -5,6 +5,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav.tsx";
 import { Footer } from "@/components/Footer.tsx";
 import { FeaturesProvider } from "@/components/features.tsx";
+import { JourneyProvider } from "@/components/journey.tsx";
 
 // Self-hosted at build time: no third-party font requests, so the CSP can stay font-src 'self'.
 const body = Hind_Siliguri({ subsets: ["bengali", "latin"], weight: ["400", "500", "600", "700"], variable: "--font-hind", display: "swap" });
@@ -27,10 +28,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="bn" className={`${body.variable} ${head.variable}`}>
       <body>
         <FeaturesProvider>
-          <a className="skip-link" href="#main">মূল অংশে যান · Skip to content</a>
-          <Nav />
-          <main id="main">{children}</main>
-          <Footer />
+          <JourneyProvider>
+            <a className="skip-link" href="#main">মূল অংশে যান · Skip to content</a>
+            <Nav />
+            <main id="main">{children}</main>
+            <Footer />
+          </JourneyProvider>
         </FeaturesProvider>
       </body>
     </html>

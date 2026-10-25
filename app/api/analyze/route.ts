@@ -4,6 +4,7 @@ import { aiEnabled, analyse } from "@/lib/ai.ts";
 import type { Analysis, DocImage } from "@/lib/prompts.ts";
 import { currentUser } from "@/lib/auth.ts";
 import { remember } from "@/lib/memory.ts";
+import { bumpStat } from "@/lib/db.ts";
 import { COUNTRIES } from "@/lib/data/countries.ts";
 import { clientIp, rateLimit, withinDailyAiBudget } from "@/lib/ratelimit.ts";
 import { assertSameOrigin, clampText, errorResponse, HttpError, json, readJson, validateUpload } from "@/lib/security.ts";
@@ -125,6 +126,8 @@ export async function POST(req: Request) {
     const premium = ai ? { negotiationScriptBn: ai.negotiationScriptBn, questionsToAskAgency: ai.questionsToAskAgency } : null;
     const free = ai ? { extracted: ai.extracted, summaryBn: ai.summaryBn, summaryEn: ai.summaryEn, nextStepsBn: ai.nextStepsBn } : null;
 
+    await bumpStat("offers_checked");
+    if (verdict === "danger") await bumpStat("dangers_flagged");
     const user = await currentUser(req);
     if (user) {
       const country = COUNTRIES.find((c) => c.code === input.countryCode);

@@ -13,6 +13,8 @@ export function proxy(request: NextRequest) {
     "img-src 'self' blob: data:",
     "font-src 'self'",
     "connect-src 'self'",
+    // On-device OCR runs in a same-origin worker (public/ocr).
+    "worker-src 'self' blob:",
     "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -33,7 +35,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|icon.svg|yunet-watermark.svg).*)",
+      source: "/((?!api|_next/static|_next/image|favicon.ico|icon.svg|yunet-watermark.svg|ocr/).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

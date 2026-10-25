@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useJourney } from "@/components/journey.tsx";
 import { DEMO_AGENCIES, lookupAgency, showSponsoredBadge, SPONSOR_COMPLAINT_LIMIT, type Agency } from "@/lib/data/agencies.ts";
 
 const STATUS = {
@@ -27,6 +28,7 @@ function AgencyCard({ a }: { a: Agency }) {
 export default function AgencyPage() {
   const [q, setQ] = useState("");
   const [searched, setSearched] = useState(false);
+  const { complete } = useJourney();
   const found = searched ? lookupAgency(q) : undefined;
 
   return (
@@ -43,6 +45,7 @@ export default function AgencyPage() {
         onSubmit={(e) => {
           e.preventDefault();
           setSearched(true);
+          if (q.trim()) complete("verified_agency");
         }}
       >
         <input aria-label="Agency name or RL number" value={q} onChange={(e) => { setQ(e.target.value); setSearched(false); }} placeholder="RL নম্বর বা নাম, e.g. RL-1003" style={{ flex: 1, minWidth: 200 }} />

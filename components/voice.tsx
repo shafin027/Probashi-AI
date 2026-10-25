@@ -142,7 +142,7 @@ export function VoiceButton({ onText, lang = "bn-BD" }: { onText: (text: string)
         className={`btn btn-ghost mic ${state === "recording" ? "mic-on" : ""}`}
         onClick={toggle}
         disabled={state === "thinking"}
-        aria-label={state === "recording" ? "Stop recording" : "Speak in Bangla"}
+        aria-label={state === "recording" ? "থামান · Stop recording" : state === "thinking" ? "বুঝছি · Transcribing" : "বলুন · Speak in Bangla"}
         title="বাংলায় বলুন"
       >
         {state === "recording" ? (
@@ -211,7 +211,7 @@ export function SpeakButton({ text }: { text: string }) {
   }
 
   return (
-    <button type="button" className="btn btn-ghost btn-sm" onClick={play} aria-label={state === "playing" ? "Stop" : "Read aloud"} disabled={state === "loading"}>
+    <button type="button" className="btn btn-ghost btn-sm" onClick={play} aria-label={state === "playing" ? "থামান · Stop" : state === "loading" ? "লোড হচ্ছে · Loading" : "শুনুন · Read aloud"} disabled={state === "loading"}>
       {state === "loading" ? "⏳ লোড হচ্ছে" : state === "playing" ? "⏸ থামান" : "🔊 শুনুন"}
     </button>
   );
