@@ -4,26 +4,36 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Loupe } from "@lucasmarkes/hairline/react";
-import { pickRound, ROUND_SIZE, type Scenario } from "@/lib/quiz.ts";
-import { useJourney } from "@/components/journey.tsx";
+import { pickRound, ROUND_SIZE, type QuizLevel, type Scenario } from "@/lib/quiz.ts";
+import { track, useJourney } from "@/components/journey.tsx";
 
 export default function QuizPage() {
-  const { progress, setQuizBest } = useJourney();
+  const { progress, setQuizBest, complete } = useJourney();
+  const [level, setLevel] = useState<QuizLevel>("easy");
   const reduce = useReducedMotion();
   const [round, setRound] = useState<Scenario[]>([]);
   const [i, setI] = useState(0);
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [correct, setCorrect] = useState(0);
 
-  useEffect(() => setRound(pickRound()), []);
+  useEffect(() => {
+    // Flow channel: users pick their own challenge (?level=hard links straight to the hard round).
+    const initial: QuizLevel = new URLSearchParams(window.location.search).get("level") === "hard" ? "hard" : "easy";
+    setLevel(initial);
+    setRound(pickRound(Math.random(), initial));
+  }, []);
 
   const current = round[i];
   const finished = round.length > 0 && i >= round.length;
   const pct = Math.round((correct / ROUND_SIZE) * 100);
 
   useEffect(() => {
-    if (finished) setQuizBest(pct);
-  }, [finished, pct, setQuizBest]);
+    if (!finished) return;
+    track(`quiz_round:${level}`);
+    if (pct >= 80) track(`quiz_pass:${level}`);
+    if (level === "easy") setQuizBest(pct);
+    else if (pct >= 80) complete("quiz_hard");
+  }, [finished, pct, level, setQuizBest, complete]);
 
   function choose(scam: boolean) {
     if (answer !== null || !current) return;
@@ -36,8 +46,9 @@ export default function QuizPage() {
     setI((x) => x + 1);
   }
 
-  function restart() {
-    setRound(pickRound());
+  function restart(next: QuizLevel = level) {
+    setLevel(next);
+    setRound(pickRound(Math.random(), next));
     setI(0);
     setCorrect(0);
     setAnswer(null);
@@ -52,6 +63,10 @@ export default function QuizPage() {
           <span className="badge">প্রতারণা চিনুন · Scam spotter</span>
           <h1 style={{ marginTop: 10 }}>আপনি কি দালালের ফাঁদ চিনতে পারবেন?</h1>
           <p className="muted">{ROUND_SIZE} real situations, taken from reported cases. Score 80% or more to earn the Scam Spotter step. Best so far: {progress.quizBest}%.</p>
+          <div className="choice-row" role="group" aria-label="Difficulty">
+            <button type="button" className="choice" aria-pressed={level === "easy"} onClick={() => restart("easy")}>সহজ · Standard</button>
+            <button type="button" className="choice" aria-pressed={level === "hard"} onClick={() => restart("hard")}>কঠিন · Hard (subtle traps)</button>
+          </div>
         </div>
         <div className="quiz-figure" aria-hidden>
           <Loupe intensity={0.6} play label="A magnifying loupe passing over a page" />
@@ -112,11 +127,26 @@ export default function QuizPage() {
           <h2>{correct}/{ROUND_SIZE} সঠিক · {pct}%</h2>
           <p className="muted">
             {pct >= 80
-              ? "দারুণ! আপনি প্রতারণা চিনতে পারেন। Scam Spotter step earned."
+              ? level === "hard"
+                ? "অসাধারণ! আপনি সূক্ষ্ম ফাঁদও ধরতে পারেন। Hard round passed."
+                : "দারুণ! আপনি প্রতারণা চিনতে পারেন। Scam Spotter step earned."
               : "আরেকবার চেষ্টা করুন। প্রতিবার নতুন পরিস্থিতি আসে। Try again: every round is different."}
           </p>
           <div className="row" style={{ justifyContent: "center" }}>
-            <button className="btn" type="button" onClick={restart}>আবার খেলুন · New round</button>
+            {pct >= 80 && level === "easy" ? (
+              <button className="btn" type="button" onClick={() => restart("hard")}>কঠিন রাউন্ডে যান · Try the hard round →</button>
+            ) : (
+              <button className="btn" type="button" onClick={() => restart()}>আবার খেলুন · New round</button>
+            )}
+            <a
+              className="btn btn-ghost"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => complete("shared_quiz")}
+              href={`https://wa.me/?text=${encodeURIComponent(`আমি দালালের ফাঁদ চেনার কুইজে ${pct}% পেয়েছি। তুমি কত পাও দেখো, টাকা দেওয়ার আগে: ${typeof window !== "undefined" ? window.location.origin : ""}/quiz`)}`}
+            >
+              পরিবারকে খেলতে দিন · Share with family
+            </a>
             <Link className="btn btn-ghost" href="/journey">আমার প্রস্তুতি →</Link>
           </div>
         </motion.div>

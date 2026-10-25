@@ -1,7 +1,8 @@
 // Scam-spotter scenarios, drawn from real reported patterns (BMET complaints, news,
 // migrant-rights research). Each round shows a random selection, so it stays fresh.
 
-export type Scenario = { id: string; bn: string; en: string; scam: boolean; whyBn: string; whyEn: string };
+export type Scenario = { id: string; bn: string; en: string; scam: boolean; whyBn: string; whyEn: string; level?: "hard" };
+export type QuizLevel = "easy" | "hard";
 
 export const SCENARIOS: Scenario[] = [
   { id: "free-visa", bn: "দালাল বলছে: “সৌদিতে আজাদ ভিসা, যেকোনো কাজ করতে পারবেন। ৬ লাখ টাকা।”", en: "Broker: “Azad visa for Saudi, do any job you like. Tk 6 lakh.”", scam: true, whyBn: "আজাদ/ফ্রি ভিসা সৌদিতে অবৈধ। কোনো মালিক আপনার দায়িত্ব নেয় না, ধরা পড়লে জেল ও ফেরত।", whyEn: "Free/azad visas are illegal in Saudi Arabia. No employer is responsible for you; workers are jailed and deported." },
@@ -18,13 +19,27 @@ export const SCENARIOS: Scenario[] = [
   { id: "contract-copy", bn: "সই করার আগে বাংলায় বোঝানো চুক্তিপত্রের একটা কপি আপনাকে দেওয়া হয়েছে।", en: "Before signing, you get a copy of the contract explained in Bangla.", scam: false, whyBn: "ঠিক এটাই হওয়া উচিত। কপিটি পরিবারের কাছেও রাখুন।", whyEn: "This is exactly right. Keep a copy with your family too." },
 ];
 
+/**
+ * Harder round (flow channel: users choose to step up once the easy round feels easy).
+ * These look legitimate on the surface; the trap is in one detail.
+ */
+export const HARD_SCENARIOS: Scenario[] = [
+  { id: "h-medical-fee", level: "hard", bn: "এজেন্সির RL নম্বর বৈধ, খরচও সরকারি সীমার কাছে। কিন্তু ‘মেডিকেল ও ট্রেনিং ফি’ বাবদ আলাদা ৮০,০০০ টাকা নগদ চাইছে, রসিদ ছাড়া।", en: "Licensed agency, price near the official limit, but an extra Tk 80,000 “medical and training fee” in cash, no receipt.", scam: true, whyBn: "বৈধ এজেন্সিও লুকানো ফি দিয়ে বেশি টাকা নেয়। রসিদ ছাড়া যেকোনো টাকা প্রতারণার লক্ষণ, অভিযোগে প্রমাণও থাকে না।", whyEn: "Licensed agencies also overcharge through hidden fees. Any payment without a receipt is a red flag and leaves no proof." },
+  { id: "h-iqama-deduct", level: "hard", bn: "সৌদি চুক্তিপত্র ঠিকঠাক, কিন্তু একটা লাইনে লেখা: ‘আকামা ও ওয়ার্ক পারমিটের খরচ বেতন থেকে কাটা হবে’।", en: "The Saudi contract looks fine, but one line says: “iqama and work permit fees will be deducted from salary”.", scam: true, whyBn: "সৌদি আইনে আকামা ও ওয়ার্ক পারমিটের খরচ মালিক দেয়। বেতন থেকে কাটা বেআইনি।", whyEn: "Under Saudi labour rules the employer pays iqama and work permit fees. Deducting them from wages is unlawful." },
+  { id: "h-blank-paper", level: "hard", bn: "ভিসা, চুক্তি, বেতন সব মিলেছে। ফ্লাইটের আগে এজেন্সি বলছে কয়েকটা সাদা কাগজে সই করে দিতে, ‘পরে লাগবে’।", en: "Visa, contract and salary all match. Before the flight the agency asks you to sign some blank papers “for later”.", scam: true, whyBn: "সাদা কাগজে সই দিলে পরে যেকোনো কিছু লিখে আপনার বিরুদ্ধে ব্যবহার করা যায়। কখনো দেবেন না।", whyEn: "Blank signed papers can be filled in later and used against you. Never sign them." },
+  { id: "h-no-smartcard", level: "hard", bn: "এজেন্সি বলছে: ‘বিএমইটি স্মার্ট কার্ড এখন লাগবে না, আপনি পৌঁছালে আমরা করে দেব। এতে তাড়াতাড়ি যেতে পারবেন।’", en: "Agency: “You don't need the BMET smart card now, we'll do it after you arrive. It's faster.”", scam: true, whyBn: "স্মার্ট কার্ড ছাড়া বিদেশ যাওয়া বৈধ নয়, আর এতে আপনি সরকারি বীমা ও সহায়তা হারান। ‘দ্রুত’ যাওয়ার টোপ বড় সতর্কতা।", whyEn: "Leaving without BMET clearance isn't legal and removes your insurance and state support. “Faster” is the bait." },
+  { id: "h-qatar-ticket-fee", level: "hard", bn: "কাতারের অফার: ‘১ লাখ টাকা রিক্রুটমেন্ট ফি দিতে হবে, এটা বৈধ কারণ এতে টিকিটের খরচ আছে।’", en: "Qatar offer: “Pay a Tk 1 lakh recruitment fee; it's legal because it covers your ticket.”", scam: true, whyBn: "কাতারের আইনে শ্রমিকের কাছ থেকে রিক্রুটমেন্ট ফি নেওয়া নিষেধ, টিকিটও মালিকের দেওয়ার কথা।", whyEn: "Qatar law bans charging workers recruitment fees, and the employer should pay the ticket." },
+  { id: "h-overtime-clause", level: "hard", bn: "চুক্তিতে দিনে ৮ ঘণ্টা কাজ লেখা, কিন্তু নিচে ছোট করে: ‘প্রয়োজনে ওভারটাইম বাধ্যতামূলক, আলাদা টাকা নেই’।", en: "The contract says 8 hours a day, but small print adds: “overtime compulsory when needed, no extra pay”.", scam: true, whyBn: "বিনা পয়সায় বাধ্যতামূলক ওভারটাইম বেআইনি এবং জোরপূর্বক শ্রমের লক্ষণ। সই করার আগে বদলাতে বলুন।", whyEn: "Compulsory unpaid overtime is unlawful and a forced-labour indicator. Ask for it to be changed before signing." },
+  { id: "h-malaysia-mou", level: "hard", bn: "মালয়েশিয়ার জন্য এজেন্সি লিখিত খরচের হিসাব দিয়েছে, যা সরকারি চুক্তির সাথে মেলে, মালিক লেভি দিচ্ছে, আর প্রতিটি টাকার রসিদ দিচ্ছে।", en: "For Malaysia the agency gives a written cost breakdown matching the government MoU, the employer pays the levy, and every payment has a receipt.", scam: false, whyBn: "এটাই নিরাপদ প্রক্রিয়া। তবু মালিকের নাম ও ঠিকানা আলাদাভাবে যাচাই করুন।", whyEn: "This is the safe process. Still verify the employer's name and address independently." },
+];
+
 export const ROUND_SIZE = 6;
 
-export function pickRound(seed = Math.random()): Scenario[] {
+export function pickRound(seed = Math.random(), level: QuizLevel = "easy"): Scenario[] {
   // Fisher–Yates with a seeded LCG so a round is reproducible in tests.
   let s = Math.floor(seed * 2 ** 31) || 1;
   const rnd = () => (s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
-  const arr = [...SCENARIOS];
+  const arr = [...(level === "hard" ? HARD_SCENARIOS : SCENARIOS)];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];

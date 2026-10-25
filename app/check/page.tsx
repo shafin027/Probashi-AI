@@ -232,6 +232,8 @@ export default function CheckPage() {
       const quiet = json.verdict !== "safe";
       complete("checked_offer", { quiet });
       if (json.agency) complete("verified_agency", { quiet });
+      // B=MAP: knowing the true cost was blocked on ability, so the check shows it and counts it.
+      if (json.cost?.officialCostBdt && json.cost?.askedCostBdt) complete("true_cost", { quiet });
       setTimeout(() => {
         document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
         document.getElementById("verdict-title")?.focus({ preventScroll: true });

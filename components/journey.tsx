@@ -3,7 +3,14 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useFeatures } from "./features.tsx";
-import { EMPTY_PROGRESS, levelFor, MILESTONES, mergeProgress, sanitiseProgress, score, type MilestoneId, type Progress } from "@/lib/journey.ts";
+import { ALL_MILESTONES, EMPTY_PROGRESS, levelFor, mergeProgress, nextStep, sanitiseProgress, score, type MilestoneId, type Progress } from "@/lib/journey.ts";
+
+/** Fire-and-forget aggregate event (no user id); never blocks the UI. */
+export function track(event: string) {
+  try {
+    void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event }), keepalive: true }).catch(() => {});
+  } catch {}
+}
 
 type Celebration = { id: number; title: string; sub: string; points: number };
 type Ctx = { progress: Progress; points: number; complete: (id: MilestoneId, opts?: { quiet?: boolean }) => void; setQuizBest: (pct: number) => void; ready: boolean };
@@ -76,10 +83,16 @@ export function JourneyProvider({ children }: { children: React.ReactNode }) {
       current.current = next;
       setProgress(next);
       writeLocal(next);
-      const gained = quiet ? [] : MILESTONES.filter((m) => next.done.includes(m.id) && !prev.done.includes(m.id));
-      for (const m of gained) celebrate({ title: m.bn, sub: m.en, points: m.points });
+      const newly = ALL_MILESTONES.filter((m) => next.done.includes(m.id) && !prev.done.includes(m.id));
+      for (const m of newly) track(`milestone:${m.id}`);
+      if (!quiet) for (const m of newly) celebrate({ title: m.bn, sub: m.en, points: m.points });
       const lvl = levelFor(score(next));
-      if (!quiet && lvl.min > levelFor(score(prev)).min) celebrate({ title: `${lvl.emoji} নতুন ধাপ: ${lvl.bn}`, sub: `Level up: ${lvl.en}`, points: 0 });
+      if (lvl.min > levelFor(score(prev)).min) {
+        track(`level:${lvl.en.toLowerCase().replace(/\s+/g, "_")}`);
+        // Goal chaining: the level-up message names the next meaningful goal (counters post-reward reset).
+        const upcoming = nextStep(next);
+        if (!quiet) celebrate({ title: `${lvl.emoji} নতুন ধাপ: ${lvl.bn}`, sub: upcoming ? `Level up: ${lvl.en}. Next: ${upcoming.en}` : `Level up: ${lvl.en}`, points: 0 });
+      }
       if (me) void push(next);
     },
     [celebrate, me, push],

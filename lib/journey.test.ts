@@ -37,3 +37,35 @@ test("quiz rounds vary and always include a safe example", () => {
     assert.equal(new Set(r.map((s) => s.id)).size, ROUND_SIZE);
   }
 });
+
+import { HARD_SCENARIOS } from "./quiz.ts";
+import { nextStep as next, phaseScore, phaseUnlocked, ALL_MILESTONES } from "./journey.ts";
+
+test("hard quiz rounds come from the hard pool and include a safe case", () => {
+  for (const seed of [0.05, 0.4, 0.8]) {
+    const r = pickRound(seed, "hard");
+    assert.equal(r.length, ROUND_SIZE);
+    assert.ok(r.every((s) => s.level === "hard"));
+    assert.ok(r.some((s) => !s.scam));
+  }
+  assert.ok(HARD_SCENARIOS.length >= ROUND_SIZE);
+});
+
+test("later phases unlock at 50 readiness and the next step chains into them", () => {
+  const early = sanitiseProgress({ done: ["checked_offer", "verified_agency"] });
+  assert.equal(phaseUnlocked(early, "abroad"), false);
+  const ready = sanitiseProgress({ done: ["checked_offer", "verified_agency", "true_cost", "quiz_passed", "asked_question", "remittance_plan"] });
+  assert.equal(score(ready), 60);
+  assert.equal(phaseUnlocked(ready, "abroad"), true);
+  const allBefore = sanitiseProgress({ done: ALL_MILESTONES.filter((m) => !m.phase).map((m) => m.id) });
+  assert.equal(score(allBefore), 100);
+  assert.equal(next(allBefore)?.phase, "abroad", "after finishing phase 1, the next goal is in phase 2");
+  assert.equal(phaseScore(sanitiseProgress({ done: ["passport_with_me", "formal_remittance"] }), "abroad"), 45);
+});
+
+test("later-phase milestones survive sanitising and phase totals are 100", async () => {
+  const { ABROAD_MILESTONES, PROTECTOR_MILESTONES } = await import("./journey.ts");
+  assert.equal(ABROAD_MILESTONES.reduce((s, m) => s + m.points, 0), 100);
+  assert.equal(PROTECTOR_MILESTONES.reduce((s, m) => s + m.points, 0), 100);
+  assert.deepEqual(sanitiseProgress({ done: ["helped_someone"] }).done, ["helped_someone"]);
+});

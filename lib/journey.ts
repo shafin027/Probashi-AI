@@ -12,7 +12,19 @@ export type MilestoneId =
   | "family_docs"
   | "bmet_registered"
   | "emergency_saved"
-  | "pre_departure";
+  | "pre_departure"
+  // Phase 2: after arrival (unlocked at "Prepared")
+  | "passport_with_me"
+  | "salary_as_contract"
+  | "salary_proof"
+  | "labour_wing_saved"
+  | "formal_remittance"
+  // Phase 3: protect others (unlocked when phase 2 starts)
+  | "helped_someone"
+  | "shared_quiz"
+  | "quiz_hard";
+
+export type PhaseId = "before" | "abroad" | "protector";
 
 export type Milestone = {
   id: MilestoneId;
@@ -24,6 +36,7 @@ export type Milestone = {
   cta: string;
   /** Manual milestones are confirmed by the user ("I've done this"); the rest complete automatically. */
   manual?: boolean;
+  phase?: PhaseId;
 };
 
 export const MILESTONES: Milestone[] = [
@@ -41,6 +54,42 @@ export const MILESTONES: Milestone[] = [
 
 export const MAX_POINTS = MILESTONES.reduce((s, m) => s + m.points, 0); // 100
 
+/**
+ * Goal chaining (gamification skill, step 4): the journey continues after departure, so a
+ * month-three user abroad and a fully-prepared user both have a meaningful next goal.
+ */
+export const ABROAD_MILESTONES: Milestone[] = [
+  { id: "passport_with_me", phase: "abroad", points: 25, bn: "পাসপোর্ট নিজের কাছে রাখছেন", en: "Your passport stays with you", why: "Gulf labour laws forbid employers from keeping your passport. If it is taken, report it to the labour wing.", href: "/ask", cta: "জিজ্ঞেস করুন", manual: true },
+  { id: "salary_as_contract", phase: "abroad", points: 20, bn: "চুক্তি অনুযায়ী বেতন পাচ্ছেন", en: "Paid as the contract says", why: "Compare each payslip with your contract. Less pay or late pay is wage theft you can claim.", href: "/ask", cta: "জিজ্ঞেস করুন", manual: true },
+  { id: "salary_proof", phase: "abroad", points: 20, bn: "বেতনের প্রমাণ রাখছেন", en: "Keeping proof of salary", why: "Photos of payslips and bank messages, sent home, are your evidence in any complaint.", href: "/journey#emergency", cta: "কী রাখবেন", manual: true },
+  { id: "labour_wing_saved", phase: "abroad", points: 15, bn: "দূতাবাসের লেবার উইং নম্বর সেভ", en: "Labour wing number saved", why: "The labour wing at the Bangladesh mission handles wage, passport and abuse complaints.", href: "/journey#emergency", cta: "নম্বর", manual: true },
+  { id: "formal_remittance", phase: "abroad", points: 20, bn: "ব্যাংক/এমএফএস-এ টাকা পাঠিয়েছেন", en: "Sent money home formally", why: "Formal channels earn a government incentive and leave proof; hundi does neither.", href: "/plan", cta: "পরিকল্পনা", manual: true },
+];
+
+export const PROTECTOR_MILESTONES: Milestone[] = [
+  { id: "helped_someone", phase: "protector", points: 40, bn: "একজনকে অফার যাচাই করতে সাহায্য", en: "Helped someone check their offer", why: "Most people hear about jobs from friends and relatives. One shared check can save a family lakhs.", href: "/check", cta: "লিংক পাঠান", manual: true },
+  { id: "shared_quiz", phase: "protector", points: 30, bn: "পরিবারকে কুইজ খেলিয়েছেন", en: "Taught family with the quiz", why: "When the family can spot a scam, the decision isn't made alone.", href: "/quiz", cta: "কুইজ", manual: true },
+  { id: "quiz_hard", phase: "protector", points: 30, bn: "কঠিন কুইজে পাস", en: "Passed the hard quiz", why: "The hard round has subtle cases: real agencies with hidden traps.", href: "/quiz?level=hard", cta: "কঠিন কুইজ" },
+];
+
+export const PHASES: { id: PhaseId; bn: string; en: string; unlockAt: number; milestones: Milestone[] }[] = [
+  { id: "before", bn: "টাকা দেওয়ার আগে", en: "Before you pay", unlockAt: 0, milestones: MILESTONES },
+  { id: "abroad", bn: "বিদেশে পৌঁছে", en: "After you arrive", unlockAt: 50, milestones: ABROAD_MILESTONES },
+  { id: "protector", bn: "অন্যকে রক্ষা করুন", en: "Protect others", unlockAt: 50, milestones: PROTECTOR_MILESTONES },
+];
+
+export const ALL_MILESTONES = PHASES.flatMap((p) => p.milestones);
+
+export function phaseScore(p: Progress, phase: PhaseId): number {
+  const ms = PHASES.find((x) => x.id === phase)!.milestones;
+  return ms.filter((m) => p.done.includes(m.id)).reduce((s, m) => s + m.points, 0);
+}
+
+/** Phases unlock from phase-1 readiness, so nobody is pushed ahead of what protects them first. */
+export function phaseUnlocked(p: Progress, phase: PhaseId): boolean {
+  return score(p) >= PHASES.find((x) => x.id === phase)!.unlockAt;
+}
+
 export type Level = { min: number; bn: string; en: string; emoji: string };
 export const LEVELS: Level[] = [
   { min: 0, bn: "যাত্রা শুরু", en: "Getting started", emoji: "🌱" },
@@ -53,7 +102,7 @@ export type Progress = { done: MilestoneId[]; quizBest: number; updatedAt: numbe
 
 export const EMPTY_PROGRESS: Progress = { done: [], quizBest: 0, updatedAt: 0 };
 
-const IDS = new Set(MILESTONES.map((m) => m.id));
+const IDS = new Set<MilestoneId>([...MILESTONES, ...ABROAD_MILESTONES, ...PROTECTOR_MILESTONES].map((m) => m.id));
 
 export function sanitiseProgress(p: unknown): Progress {
   const o = (p && typeof p === "object" ? p : {}) as Partial<Progress>;
@@ -80,7 +129,15 @@ export function nextLevel(points: number): Level | null {
   return LEVELS.find((l) => l.min > points) ?? null;
 }
 
-/** The single most useful next step (the Zeigarnik "open loop", used for the user's benefit). */
+/**
+ * The single most useful next step. Chains into the next unlocked phase when the current one
+ * is done, so reaching a goal always reveals the next meaningful one (counters post-reward reset).
+ */
 export function nextStep(p: Progress): Milestone | null {
-  return MILESTONES.find((m) => !p.done.includes(m.id)) ?? null;
+  for (const phase of PHASES) {
+    if (!phaseUnlocked(p, phase.id)) continue;
+    const m = phase.milestones.find((x) => !p.done.includes(x.id));
+    if (m) return m;
+  }
+  return null;
 }
