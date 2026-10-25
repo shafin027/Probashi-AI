@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-WITH_SERVER="../.claude/skills/webapp-testing/scripts/with_server.py"
+WITH_SERVER=".claude/skills/webapp-testing/scripts/with_server.py"
 MOCK="http://127.0.0.1:4010"
 COMMON="NODE_ENV=production REPORT_SECRET=integration-test-secret-0123456789abcdef PAYMENT_MODE=demo HEALTH_TOKEN=health-token-for-tests-123456"
 # Unset any ambient credentials/base URLs so only the mock is ever called.

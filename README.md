@@ -98,6 +98,7 @@ Browser ──HTTPS──▶ Next.js on Vercel (proxy.ts: nonce CSP + security h
 ## Run locally
 
 ```bash
+git clone https://github.com/shafin027/probashi-ai.git
 cd probashi-ai
 npm install
 cp .env.example .env.local   # add ANTHROPIC_API_KEY and/or OPENAI_API_KEY
@@ -108,7 +109,7 @@ npm run dev                  # http://localhost:3000 (embedded Postgres+pgvector
 
 1. **Database:** create a Postgres database with pgvector, e.g. Neon from the Vercel Marketplace (Storage → Neon). This sets `DATABASE_URL`. Tables are created automatically on first request.
 2. **Rate limits:** add Upstash Redis from the Vercel Marketplace (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`).
-3. Import `shafin027/CS` on [vercel.com/new](https://vercel.com/new), set **Root Directory = `probashi-ai`**.
+3. Import `shafin027/probashi-ai` on [vercel.com/new](https://vercel.com/new). The app is at the repository root, so leave Root Directory as is.
 4. Environment variables (Production): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (optional but recommended), `REPORT_SECRET` (`openssl rand -base64 48`), `HEALTH_TOKEN`, `AI_DAILY_LIMIT`, `PAYMENT_MODE=demo`. Add `ALLOWED_ORIGINS` if you use a custom domain.
 5. Deploy a **Preview** first, run `BASE_URL=<preview-url> npm run test:live`, then promote to Production.
 6. Check `curl -H "x-health-token: $HEALTH_TOKEN" https://<domain>/api/health`: every value should be true.
@@ -140,7 +141,7 @@ The footer on every page shows the "Built for YUNet AIgnite Buildathon 2026" wat
 
 ## Skills used
 
-From [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills), vendored in `.claude/skills/` (Apache-2.0):
+From [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills), vendored in this repo under `.claude/skills/` (Apache-2.0):
 - **webapp-testing**: `with_server.py` runs the mock AI and multiple app configurations for the integration and E2E suites (`tests/run-*.sh`)
 - **theme-factory**: the "Forest Canopy" theme for the web app and the deck
 - **pptx**: the pitch deck
