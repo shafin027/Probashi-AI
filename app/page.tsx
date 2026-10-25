@@ -59,19 +59,44 @@ export default function Home() {
   return (
     <>
       <section className="hero">
-        <div className="container">
-          <span className="badge">বিদেশে কাজ · Safe migration</span>
-          <h1 style={{ marginTop: 12 }}>
-            টাকা দেওয়ার আগে <span>যাচাই করুন</span>
-          </h1>
-          <p style={{ fontSize: "1.15rem", maxWidth: 680 }}>
-            Probashi AI checks your overseas job offer, agency and price in plain Bangla <em>before</em> you hand over lakhs of taka to a
-            dalal.
-            <span className="en">AI safety copilot for Bangladeshi migrant workers and their families.</span>
-          </p>
-          <div className="row hero-cta">
-            <Link className="btn" href="/check">অফার চেক করুন (ফ্রি)</Link>
-            <Link className="btn btn-ghost" href="/ask">🎤 বাংলায় প্রশ্ন করুন</Link>
+        <div className="container hero-grid">
+          <div>
+            <span className="badge">বিদেশে কাজ · Safe migration</span>
+            <h1 style={{ marginTop: 12 }}>
+              টাকা দেওয়ার আগে <span>যাচাই করুন</span>
+            </h1>
+            <p className="hero-lead">
+              Probashi AI checks your overseas job offer, agency and price in plain Bangla <em>before</em> you hand over lakhs of taka to
+              a dalal.
+              <span className="en">AI safety copilot for Bangladeshi migrant workers and their families.</span>
+            </p>
+            <div className="row hero-cta">
+              <Link className="btn" href="/check">অফার চেক করুন (ফ্রি)</Link>
+              <Link className="btn btn-ghost" href="/ask">🎤 বাংলায় প্রশ্ন করুন</Link>
+            </div>
+            <div className="trust" aria-label="Why people trust it">
+              <span>ফ্রি নিরাপত্তা যাচাই</span>
+              <span>কাগজ সংরক্ষণ হয় না</span>
+              <span>Sources on every fact</span>
+              <span>Voice-first Bangla</span>
+            </div>
+          </div>
+          <div className="phone" aria-label="Example result" role="img">
+            <div className="phone-screen">
+              <div className="small muted">অফার চেক · Saudi Arabia</div>
+              <div className="phone-row" style={{ marginTop: 10 }}>
+                <div className="ring sm" data-score="0" style={{ ["--v" as string]: 4 }} />
+                <div>
+                  <strong style={{ color: "var(--danger)", fontSize: "1.1rem" }}>বিপদ! টাকা দেবেন না</strong>
+                  <div className="small muted">Danger: 6 high-risk flags</div>
+                </div>
+              </div>
+              <div className="mini-flag">ফ্রি/আজাদ ভিসা: illegal in the Gulf</div>
+              <div className="mini-flag">খরচ সরকারি সীমার ৩.৯ গুণ</div>
+              <div className="mini-flag">টাকা দালালকে দেওয়া হচ্ছে</div>
+              <div className="mini-flag med">পাসপোর্ট দালালের কাছে</div>
+              <div className="btn btn-sm" style={{ width: "100%", marginTop: 12 }}>পরিবারকে পাঠান</div>
+            </div>
           </div>
         </div>
       </section>

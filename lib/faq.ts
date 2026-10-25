@@ -71,3 +71,13 @@ export function offlineAnswer(question: string): string {
   if (hit) return `${hit.aBn}\n\n${hit.a}`;
   return "এই মুহূর্তে এআই চালু নেই। অফার যাচাই করতে 'অফার চেক' পাতায় যান, অথবা 16135-এ ফোন করুন।\n\nAI is offline right now. Use the Offer Check page, or call 16135.";
 }
+
+const DEFAULT_SUGGESTIONS = ["মালয়েশিয়া যেতে সরকারি খরচ কত?", "এজেন্সি আসল কিনা কীভাবে বুঝব?", "বিএমইটি স্মার্ট কার্ড কেন লাগে?"];
+
+/** Follow-up questions when AI is offline, so the conversation can keep going. */
+export function offlineSuggestions(question: string): string[] {
+  if (EMERGENCY_RE.test(question)) return ["দূতাবাসে কীভাবে অভিযোগ করব?", "পাসপোর্ট ফেরত পেতে কী করব?", "বেতন না দিলে কোথায় যাব?"];
+  if (/visa|ভিসা/i.test(question)) return ["ফ্রি ভিসা কেন বিপজ্জনক?", "ভিসার আসল-নকল কীভাবে চিনব?", "কাজের ভিসা আর ভিজিট ভিসার পার্থক্য কী?"];
+  if (/cost|খরচ|টাকা/i.test(question)) return ["সৌদি যেতে সরকারি খরচ কত?", "দালাল বেশি টাকা চাইলে কী করব?", "ঋণ নিয়ে বিদেশ যাওয়া কি ঠিক?"];
+  return DEFAULT_SUGGESTIONS;
+}

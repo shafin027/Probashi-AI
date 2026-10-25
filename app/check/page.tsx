@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { COUNTRIES } from "@/lib/data/countries.ts";
 import type { Flag, CostAnalysis } from "@/lib/rules.ts";
-import type { Analysis } from "@/lib/claude.ts";
+import type { Analysis } from "@/lib/prompts.ts";
 import type { Agency } from "@/lib/data/agencies.ts";
 import { SpeakButton, VoiceButton } from "@/components/voice.tsx";
 import { PayModal } from "@/components/PayModal.tsx";
@@ -15,7 +15,8 @@ type Result = {
   cost: CostAnalysis;
   agency: Agency | null;
   country: { name: string; nameBn: string; currency: string; officialCostSource: string; warnings: string[]; embassy: string } | null;
-  ai: Analysis | null;
+  ai: Pick<Analysis, "extracted" | "summaryBn" | "summaryEn" | "nextStepsBn"> | null;
+  reportToken: string | null;
   aiMode: "ai" | "rules-fallback" | "rules-only";
   aiError: string | null;
 };
@@ -37,6 +38,11 @@ const SAMPLE = {
   offerText:
     "ভাই, সৌদি আরবে ফ্রি ভিসা আছে। কাজ: ক্লিনার, বেতন ১২০০ রিয়াল, থাকা খাওয়া ফ্রি। মোট খরচ ৬ লাখ ৫০ হাজার, এখন ২ লাখ অগ্রিম দিতে হবে। পাসপোর্ট আমার কাছে জমা দিন। ১৫ দিনের মধ্যে ফ্লাইট।",
 };
+
+type Premium = Pick<Analysis, "negotiationScriptBn" | "questionsToAskAgency">;
+
+const STAGES = ["কাগজ পড়া হচ্ছে · Reading the document", "নিয়ম মিলিয়ে দেখা হচ্ছে · Checking rules and official costs", "এজেন্সি যাচাই · Checking the agency", "রিপোর্ট লেখা হচ্ছে · Writing your Bangla report"];
+const RING_COLOR = { safe: "var(--safe)", caution: "var(--caution)", danger: "var(--danger)" };
 
 function fmt(n: number | null | undefined) {
   return n == null ? "—" : `৳${Math.round(n).toLocaleString("en-IN")}`;
@@ -96,8 +102,16 @@ export default function CheckPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
-  const [unlocked, setUnlocked] = useState(false);
+  const [premium, setPremium] = useState<Premium | null>(null);
   const [payOpen, setPayOpen] = useState(false);
+  const [stage, setStage] = useState(0);
+
+  useEffect(() => {
+    if (!loading) return;
+    setStage(0);
+    const t = setInterval(() => setStage((s) => Math.min(s + 1, STAGES.length - 1)), 3500);
+    return () => clearInterval(t);
+  }, [loading]);
 
   const country = COUNTRIES.find((c) => c.code === countryCode)!;
   const tri = (v: "yes" | "no" | "unknown") => (v === "unknown" ? undefined : v === "yes");
@@ -123,6 +137,7 @@ export default function CheckPage() {
       return;
     }
     try {
+      if (!/^image\//.test(f.type) && f.type !== "application/pdf") throw new Error("type");
       setDoc(await fileToDoc(f));
       setError("");
     } catch {
@@ -135,7 +150,7 @@ export default function CheckPage() {
     setLoading(true);
     setError("");
     setResult(null);
-    setUnlocked(false);
+    setPremium(null);
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -282,22 +297,36 @@ export default function CheckPage() {
           <button className="btn" type="submit" disabled={loading} style={{ width: "100%" }}>
             {loading ? "যাচাই হচ্ছে… (AI reading)" : "ফ্রি যাচাই করুন · Check now"}
           </button>
-          {error && <p style={{ color: "var(--danger)", marginTop: 12 }}>{error}</p>}
+          {loading && (
+            <ol className="progress" aria-live="polite">
+              {STAGES.map((st, i) => (
+                <li key={st} className={i < stage ? "done" : i === stage ? "active" : ""}>{st}</li>
+              ))}
+            </ol>
+          )}
+          {error && <p role="alert" style={{ color: "var(--danger)", marginTop: 12 }}>{error}</p>}
+          <div className="security-note" style={{ marginTop: 12 }}>
+            <span aria-hidden>🔒</span>
+            <span>Encrypted connection. Files are checked for safety, used once for this check, and never stored or shown to agencies.</span>
+          </div>
         </div>
       </form>
 
       {result && v && (
         <section id="result" className="stack" style={{ marginTop: 32 }}>
           <div className={`verdict verdict-${result.verdict}`}>
-            <div className="row" style={{ alignItems: "center" }}>
-              <div className="light" aria-hidden />
+            <div className="row" style={{ alignItems: "center", gap: 18 }}>
+              <div
+                className="ring"
+                data-score={result.score}
+                role="img"
+                aria-label={`Safety score ${result.score} out of 100`}
+                style={{ ["--v" as string]: Math.max(result.score, 3), ["--c" as string]: RING_COLOR[result.verdict] }}
+              />
               <div style={{ flex: 1, minWidth: 200 }}>
                 <h2 style={{ margin: 0 }}>{v.bn}</h2>
                 <div className="muted">{v.en}</div>
-              </div>
-              <div className="center">
-                <div className="score">{result.score}</div>
-                <div className="small muted">safety score / 100</div>
+                <div className="small muted">নিরাপত্তা স্কোর · safety score / 100</div>
               </div>
             </div>
             {result.ai && (
@@ -370,18 +399,18 @@ export default function CheckPage() {
 
           <div className="card">
             <h3>📋 পূর্ণ রিপোর্ট · Full Verified Report</h3>
-            {result.ai ? (
-              unlocked ? (
+            {result.ai && result.reportToken ? (
+              premium ? (
                 <div className="stack">
                   <div>
                     <strong>দরকষাকষির কথা · Negotiation script</strong>
-                    <p style={{ whiteSpace: "pre-wrap" }}>{result.ai.negotiationScriptBn}</p>
-                    <SpeakButton text={result.ai.negotiationScriptBn} />
+                    <p style={{ whiteSpace: "pre-wrap" }}>{premium.negotiationScriptBn}</p>
+                    <SpeakButton text={premium.negotiationScriptBn} />
                   </div>
                   <div>
                     <strong>এজেন্সিকে জিজ্ঞেস করুন · Ask the agency</strong>
                     <ol>
-                      {result.ai.questionsToAskAgency.map((q) => (
+                      {premium.questionsToAskAgency.map((q) => (
                         <li key={q}>{q}</li>
                       ))}
                     </ol>
@@ -395,9 +424,9 @@ export default function CheckPage() {
                 </div>
               ) : (
                 <div className="locked">
-                  <div className="blur">
-                    <p>{result.ai.negotiationScriptBn.slice(0, 220)}</p>
-                    <ol>{result.ai.questionsToAskAgency.slice(0, 3).map((q) => <li key={q}>{q}</li>)}</ol>
+                  <div className="blur" aria-hidden>
+                    <p>ভাই, আমি বিএমইটি-র সরকারি খরচের তালিকা দেখেছি। এই দেশের জন্য সর্বোচ্চ খরচ নির্ধারিত আছে, তাই আমি রসিদ ছাড়া…</p>
+                    <ol><li>আপনার RL নম্বর কত?</li><li>মালিকের নাম ও ঠিকানা কী?</li><li>চুক্তিপত্রের কপি কবে পাব?</li></ol>
                   </div>
                   <div className="unlock">
                     <button className="btn btn-accent" type="button" onClick={() => setPayOpen(true)}>
@@ -422,7 +451,16 @@ export default function CheckPage() {
         </section>
       )}
 
-      <PayModal open={payOpen} amount={299} onClose={() => setPayOpen(false)} onPaid={() => { setUnlocked(true); setPayOpen(false); }} />
+      <PayModal
+        open={payOpen}
+        amount={299}
+        token={result?.reportToken ?? null}
+        onClose={() => setPayOpen(false)}
+        onPaid={(p) => {
+          setPremium(p);
+          setPayOpen(false);
+        }}
+      />
     </div>
   );
 }

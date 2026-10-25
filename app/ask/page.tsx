@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { SpeakButton, VoiceButton } from "@/components/voice.tsx";
+import { useFeatures } from "@/components/features.tsx";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; personalised?: boolean };
 
-const SUGGESTIONS = [
+const STARTERS = [
   "মালয়েশিয়া যেতে সরকারি খরচ কত?",
   "ফ্রি ভিসা কি নিরাপদ?",
   "সৌদিতে মালিক বেতন দিচ্ছে না, কী করব?",
@@ -14,13 +16,24 @@ const SUGGESTIONS = [
 ];
 
 export default function AskPage() {
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "আসসালামু আলাইকুম! বিদেশে কাজ, খরচ, ভিসা বা বিপদ নিয়ে যেকোনো প্রশ্ন বাংলায় লিখুন বা মাইকে বলুন।" },
-  ]);
+  const { me, accounts, naturalVoice } = useFeatures();
+  const greeting = me
+    ? `আবার স্বাগতম, ${me.name.split(" ")[0]}! আগের কথাগুলো আমার মনে আছে। আজ কী নিয়ে সাহায্য করতে পারি?`
+    : "আসসালামু আলাইকুম! বিদেশে কাজ, খরচ, ভিসা বা বিপদ নিয়ে যেকোনো প্রশ্ন বাংলায় লিখুন বা মাইকে বলুন।";
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>(STARTERS);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const lastSpoken = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      setAutoSpeak(localStorage.getItem("pa-autospeak") === "1");
+    } catch {}
+  }, []);
 
   async function send(text: string) {
     const content = text.trim();
@@ -29,55 +42,92 @@ export default function AskPage() {
     setMessages(next);
     setInput("");
     setLoading(true);
+    setSuggestions([]);
     try {
-      // Drop the canned greeting; the API expects the conversation to start with the user.
-      const history = next.slice(1).slice(-12);
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: next.slice(-12).map(({ role, content }) => ({ role, content })) }),
       });
       const json = await res.json();
-      setMessages([...next, { role: "assistant", content: json.answer ?? json.error ?? "দুঃখিত, আবার চেষ্টা করুন।" }]);
-      setNotice(json.mode === "offline" ? json.notice ?? "Offline mode: answers come from our built-in FAQ." : "");
+      setMessages([...next, { role: "assistant", content: json.answer ?? json.error ?? "দুঃখিত, আবার চেষ্টা করুন।", personalised: json.personalised }]);
+      setSuggestions(json.suggestions?.length ? json.suggestions : STARTERS.slice(0, 3));
+      setNotice(json.mode === "offline" ? json.notice ?? "Offline mode: answers come from our built-in guide." : "");
     } catch {
       setMessages([...next, { role: "assistant", content: "নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন, জরুরি হলে 16135-এ ফোন করুন।" }]);
     } finally {
       setLoading(false);
-      setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      setTimeout(() => {
+        endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        if (autoSpeak) lastSpoken.current?.querySelector<HTMLButtonElement>("button")?.click();
+      }, 80);
     }
   }
 
   return (
-    <div className="container section" style={{ maxWidth: 760 }}>
-      <h1>প্রশ্ন করুন</h1>
-      <p className="muted">Ask anything about migrating for work, by text or voice. Answers cite their sources.</p>
-      <div className="row" style={{ marginBottom: 16 }}>
-        {SUGGESTIONS.map((s) => (
-          <button key={s} type="button" className="choice small" onClick={() => send(s)}>
-            {s}
-          </button>
-        ))}
+    <div className="container section" style={{ maxWidth: 780 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ marginBottom: 4 }}>প্রশ্ন করুন</h1>
+          <p className="muted" style={{ margin: 0 }}>Ask anything about working abroad, by voice or text. {naturalVoice ? "Natural Bangla voice on." : ""}</p>
+        </div>
+        <label className="row small" style={{ fontWeight: 500, margin: 0 }}>
+          <input
+            type="checkbox"
+            style={{ width: 20, minHeight: 20 }}
+            checked={autoSpeak}
+            onChange={(e) => {
+              setAutoSpeak(e.target.checked);
+              try {
+                localStorage.setItem("pa-autospeak", e.target.checked ? "1" : "0");
+              } catch {}
+            }}
+          />
+          উত্তর পড়ে শোনাও
+        </label>
       </div>
-      <div className="card">
+
+      {accounts && !me && (
+        <div className="security-note" style={{ margin: "16px 0" }}>
+          <span aria-hidden>🧠</span>
+          <span>
+            <Link href="/login">লগইন করুন</Link> so I can remember your earlier checks and give more personal advice next time.
+          </span>
+        </div>
+      )}
+
+      <div className="card" style={{ marginTop: 16 }}>
         <div className="chat" aria-live="polite">
+          <div className="bubble bubble-ai">{greeting}</div>
           {messages.map((m, i) => (
-            <div key={i} className={`bubble ${m.role === "user" ? "bubble-user" : "bubble-ai"}`}>
+            <div key={i} className={`bubble ${m.role === "user" ? "bubble-user" : "bubble-ai"}`} ref={m.role === "assistant" && i === messages.length - 1 ? lastSpoken : undefined}>
               {m.content}
-              {m.role === "assistant" && i > 0 && (
-                <div style={{ marginTop: 6 }}>
+              {m.role === "assistant" && (
+                <div className="row" style={{ marginTop: 8, gap: 8 }}>
                   <SpeakButton text={m.content} />
+                  {m.personalised && <span className="memory-pill">🧠 আপনার আগের তথ্য ব্যবহার করা হয়েছে</span>}
                 </div>
               )}
             </div>
           ))}
-          {loading && <div className="bubble bubble-ai muted">ভাবছি…</div>}
+          {loading && <div className="bubble bubble-ai muted" aria-label="Thinking">ভাবছি…</div>}
           <div ref={endRef} />
         </div>
-        {notice && <p className="small muted">{notice}</p>}
+
+        {suggestions.length > 0 && !loading && (
+          <div className="chips" style={{ marginTop: 14 }} aria-label="Suggested questions">
+            {suggestions.map((s) => (
+              <button key={s} type="button" className="chip" onClick={() => send(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+        {notice && <p className="small muted" style={{ marginTop: 10 }}>{notice}</p>}
+
         <form
           className="chat-input"
-          style={{ marginTop: 12 }}
+          style={{ marginTop: 14 }}
           onSubmit={(e) => {
             e.preventDefault();
             send(input);
@@ -86,6 +136,7 @@ export default function AskPage() {
           <textarea
             aria-label="Your question"
             value={input}
+            maxLength={2000}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

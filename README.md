@@ -18,7 +18,10 @@ Built for **YUNet AIgnite Buildathon 2026**.
 | `/check` **Offer Checker** | Photo/PDF of visa, contract or demand letter, plus a pasted or spoken offer message → 🟢🟡🔴 verdict, red flags, cost check, next steps, full report (negotiation script, agency questions, printable/WhatsApp share) | Claude vision + structured JSON |
 | `/cost` **True Cost Calculator** | Official ceiling vs. asked price, loan interest, payoff months, take-home after the contract | — |
 | `/agency` **Agency Lookup** | RL licence status, verified complaints, labelled "Sponsored" listings that lose the badge automatically | — |
-| `/ask` **Ask in Bangla** | Voice or text Q&A with sources; emergency answers surface 16135 / 999 | Claude |
+| `/ask` **Ask in Bangla** | Voice or text Q&A with sources, 3 personalised follow-up suggestions, auto read-aloud; emergency answers surface 16135 / 999 | Claude / OpenAI |
+| Voice everywhere | Natural Bangla speech-to-text (`gpt-4o-transcribe`) and neural text-to-speech (`gpt-4o-mini-tts`, warm Dhaka-Bangla instructions); browser voice as fallback | OpenAI |
+| `/login`, `/account` **Accounts + memory** | Phone + password accounts; a **pgvector memory** of each user's checks and questions, recalled by meaning to personalise answers; view/forget memories, turn memory off, delete account | OpenAI embeddings |
+| `/privacy` | What is stored and how it is protected | — |
 | `/plan` **Family & Money Plan** | Formal remittance vs. hundi, debt payoff, savings goal, family document checklist | — |
 | `/` Landing | Problem, how it works, **"why" FAQ**, pricing, business model and checks and balances, scale story, **buildathon watermark** | — |
 
@@ -40,33 +43,67 @@ Built for **YUNet AIgnite Buildathon 2026**.
 
 The AI cost per report is about ৳10–20 and the payment gateway takes about 2%, so gross margin is about 90%. The checkout is a **demo** (no real money is charged). Production would use the bKash Tokenized Checkout or SSLCommerz with server-side verification.
 
+## Architecture
+
+```
+Browser ──HTTPS──▶ Next.js on Vercel (proxy.ts: nonce CSP + security headers)
+                    ├─ /api/analyze ─ guards ─▶ rule engine ─▶ Claude (fallback: OpenAI) vision + JSON schema
+                    ├─ /api/ask ───── guards ─▶ pgvector recall ─▶ Claude/OpenAI ─▶ answer + 3 suggestions
+                    ├─ /api/voice/stt|tts ───▶ OpenAI gpt-4o-transcribe / gpt-4o-mini-tts
+                    ├─ /api/auth/* /api/account /api/memories ─▶ Postgres + pgvector (Neon/Supabase)
+                    └─ /api/unlock ─▶ AES-256-GCM sealed premium report
+```
+
+## Security
+
+| Threat | Protection |
+|---|---|
+| XSS / script injection | Per-request **nonce CSP** with `strict-dynamic`, `object-src 'none'`, React escaping, no `dangerouslySetInnerHTML` |
+| Clickjacking | `frame-ancestors 'none'`, `X-Frame-Options: DENY` |
+| CSRF / other sites using our API | Strict **Origin check** on every state-changing route; SameSite=Lax cookies |
+| Session theft | 256-bit random tokens, only SHA-256 stored, `__Host-` **HttpOnly Secure** cookie, server-side logout |
+| Password cracking | **scrypt** (N=16384) with per-user salt, common-password block, constant-time compare |
+| Brute force / enumeration | Per-IP and per-account login throttling; identical errors and timing for unknown numbers |
+| Malicious uploads | **Magic-byte** type check, size caps, streaming body limit, PDFs with JavaScript/launch actions rejected |
+| Injection (SQL / schema) | Parameterised SQL only; strict zod schemas reject unknown fields |
+| Prompt injection | Untrusted content wrapped and labelled; AI can't remove rule-engine flags; outputs clamped |
+| Bill abuse / DoS | Per-IP rate limits (Upstash-backed in prod), **global daily AI cap**, request timeouts |
+| Payment bypass | Paid content **encrypted** until the unlock endpoint verifies payment; tampered tokens fail auth |
+| Data leakage | Generic errors, no secrets in client bundle (tested), no document storage, delete-my-data |
+
+## Testing (all must pass before deploying)
+
+| Command | What it proves |
+|---|---|
+| `npm run lint` | TypeScript strict typecheck |
+| `npm test` | Rule-engine unit tests |
+| `npm run test:integration` | **43 tests** on a production build with a recording mock AI: headers/CSP, origin/size/type guards, disguised and malicious uploads, Claude + OpenAI request shapes (image/PDF OCR blocks, schemas, fallbacks), refusal/bad-JSON/500 fallbacks, sealed report + tampering, accounts, cookie flags, brute-force throttling, vector-memory ranking, memory erase, account deletion, STT/TTS, rate limits, no secrets in the bundle |
+| `npm run test:e2e` | Real Chromium, desktop + mobile (webapp-testing skill): offer-letter upload, OCR result, paid unlock, sign-up, memory-personalised chat, suggestion chips, **fake microphone → STT**, TTS playback, account deletion, no CSP violations or console errors, no horizontal scroll |
+| `npm run test:live` | **Real AI, no mocks**: OCR on generated English/Bangla offer letters (PNG + PDF), prompt-injection document, Bangla chat, TTS→STT voice round trip, account + memory personalisation |
+
+`npm run predeploy` runs all of them.
+
 ## Run locally
 
 ```bash
 cd probashi-ai
 npm install
-cp .env.example .env.local   # add ANTHROPIC_API_KEY to enable AI
-npm run dev                  # http://localhost:3000
+cp .env.example .env.local   # add ANTHROPIC_API_KEY and/or OPENAI_API_KEY
+npm run dev                  # http://localhost:3000 (embedded Postgres+pgvector, no setup)
 ```
 
-## Deploy (live link for judges)
+## Deploy to Vercel (after `npm run predeploy` passes)
 
-1. Import `shafin027/CS` on [vercel.com/new](https://vercel.com/new) and set **Root Directory = `probashi-ai`**.
-2. Add the environment variable `ANTHROPIC_API_KEY` (optionally `CLAUDE_MODEL`).
-3. Deploy, then put the URL into the deck (slide 5) and your submission.
+1. **Database:** create a Postgres database with pgvector, e.g. Neon from the Vercel Marketplace (Storage → Neon). This sets `DATABASE_URL`. Tables are created automatically on first request.
+2. **Rate limits:** add Upstash Redis from the Vercel Marketplace (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`).
+3. Import `shafin027/CS` on [vercel.com/new](https://vercel.com/new), set **Root Directory = `probashi-ai`**.
+4. Environment variables (Production): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (optional but recommended), `REPORT_SECRET` (`openssl rand -base64 48`), `HEALTH_TOKEN`, `AI_DAILY_LIMIT`, `PAYMENT_MODE=demo`. Add `ALLOWED_ORIGINS` if you use a custom domain.
+5. Deploy a **Preview** first, run `BASE_URL=<preview-url> npm run test:live`, then promote to Production.
+6. Check `curl -H "x-health-token: $HEALTH_TOKEN" https://<domain>/api/health`: every value should be true.
 
 ## Watermark
 
 The footer on every page shows the "Built for YUNet AIgnite Buildathon 2026" watermark from `public/yunet-watermark.svg`. **Replace that file with the official file from the organisers** (same name, or update the `src` in `components/Footer.tsx`).
-
-## Tests
-
-```bash
-npm test                     # rule-engine unit tests
-npm run build
-python ../.claude/skills/webapp-testing/scripts/with_server.py \
-  --server "npm run start -- -p 3100" --port 3100 -- python tests/e2e.py   # Playwright E2E, desktop + mobile
-```
 
 ## Pitch deck
 
@@ -75,7 +112,7 @@ python ../.claude/skills/webapp-testing/scripts/with_server.py \
 ## Skills used
 
 From [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills), vendored in `.claude/skills/` (Apache-2.0):
-- **webapp-testing**: Playwright E2E harness (`with_server.py`, `tests/e2e.py`)
+- **webapp-testing**: `with_server.py` runs the mock AI and multiple app configurations for the integration and E2E suites (`tests/run-*.sh`)
 - **theme-factory**: the "Forest Canopy" theme for the web app and the deck
 - **pptx**: the pitch deck
 
