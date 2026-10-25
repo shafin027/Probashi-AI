@@ -28,6 +28,8 @@ export type OfferInput = {
   foundVia?: "agency" | "social" | "relative" | "unknown";
   passportHandedOver?: boolean;
   offerText?: string;
+  /** Agency already resolved against the live registry. When absent, the demo list is used. */
+  resolvedAgency?: Agency | null;
 };
 
 export type CostAnalysis = {
@@ -85,7 +87,7 @@ export function analyseOffer(input: OfferInput): RuleResult {
 
   let agency: Agency | null = null;
   if (input.agencyQuery?.trim()) {
-    agency = lookupAgency(input.agencyQuery) ?? null;
+    agency = input.resolvedAgency !== undefined ? input.resolvedAgency : (lookupAgency(input.agencyQuery) ?? null);
     if (!agency) {
       flags.push({
         id: "agency-unknown",
@@ -101,6 +103,14 @@ export function analyseOffer(input: OfferInput): RuleResult {
         title: `Agency licence ${agency.licenceStatus}`,
         titleBn: "এজেন্সির লাইসেন্স বাতিল/স্থগিত",
         detail: `${agency.name} (${agency.rl}) cannot legally recruit right now.`,
+      });
+    } else if (agency.trust && agency.trust.level === "low") {
+      flags.push({
+        id: "agency-low-trust",
+        severity: "medium",
+        title: "Agency has a low confidence score",
+        titleBn: "এজেন্সির আস্থা স্কোর কম",
+        detail: `${agency.name} scores ${agency.trust.score}/100 from verified worker reviews and substantiated complaints.`,
       });
     } else if (agency.verifiedComplaints > 5) {
       flags.push({

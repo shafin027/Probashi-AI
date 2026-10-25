@@ -6,10 +6,14 @@ export type Agency = {
   rl: string;
   name: string;
   district: string;
-  licenceStatus: "valid" | "suspended" | "cancelled";
+  licenceStatus: "valid" | "suspended" | "cancelled" | "expired";
   verifiedComplaints: number;
   placementsLastYear: number;
   sponsored: boolean;
+  /** Set when the agency comes from the live registry (not the demo list). */
+  validUntil?: string | null;
+  profileId?: string | null;
+  trust?: { score: number; level: string; labelBn: string; labelEn: string; reviewCount: number; averageRating: number | null };
 };
 
 export const DEMO_AGENCIES: Agency[] = [

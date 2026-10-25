@@ -7,10 +7,10 @@ import { useFeatures } from "./features.tsx";
 import { ReadinessRing, useJourney } from "./journey.tsx";
 
 const LINKS = [
-  { href: "/cost", label: "খরচ হিসাব", en: "Cost" },
   { href: "/agency", label: "এজেন্সি যাচাই", en: "Agencies" },
+  { href: "/offers", label: "যাচাইকৃত অফার", en: "Offers" },
   { href: "/ask", label: "প্রশ্ন করুন", en: "Ask" },
-  { href: "/plan", label: "পরিবার ও টাকা", en: "Family" },
+  { href: "/help", label: "সাহায্য", en: "Help" },
 ];
 
 export function Nav() {
@@ -60,6 +60,18 @@ export function Nav() {
             <span className="sr-only"> {points}/100</span>
             <span className="nav-en">Readiness {points}/100</span>
           </Link>
+          {me && (me.role === "legal" || me.role === "admin") && (
+            <Link href="/legal" aria-current={pathname === "/legal" ? "page" : undefined}>
+              আইনি টিম
+              <span className="nav-en">Legal team</span>
+            </Link>
+          )}
+          {me?.role === "agency" && (
+            <Link href="/partner" aria-current={pathname === "/partner" ? "page" : undefined}>
+              এজেন্সি প্যানেল
+              <span className="nav-en">Agency portal</span>
+            </Link>
+          )}
           {accounts &&
             (me ? (
               <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className="nav-user">

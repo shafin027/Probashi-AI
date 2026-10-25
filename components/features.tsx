@@ -2,15 +2,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
-export type Me = { name: string; phone: string; memoryEnabled: boolean } | null;
-type Features = { ai: boolean; naturalVoice: boolean; accounts: boolean };
+export type Role = "worker" | "agency" | "legal" | "admin";
+export type Me = { name: string; phone: string; memoryEnabled: boolean; role: Role; premium: boolean; premiumUntil: string | null; hasPhonePin: boolean } | null;
+type Features = { ai: boolean; naturalVoice: boolean; accounts: boolean; phoneLine: string | null };
 type Ctx = Features & { me: Me; refreshMe: () => Promise<void>; loaded: boolean };
 
-const FeaturesContext = createContext<Ctx>({ ai: false, naturalVoice: false, accounts: false, me: null, refreshMe: async () => {}, loaded: false });
+const FeaturesContext = createContext<Ctx>({ ai: false, naturalVoice: false, accounts: false, phoneLine: null, me: null, refreshMe: async () => {}, loaded: false });
 
 /** Loads which features the server offers and who is logged in, once per page load. */
 export function FeaturesProvider({ children }: { children: React.ReactNode }) {
-  const [features, setFeatures] = useState<Features>({ ai: false, naturalVoice: false, accounts: false });
+  const [features, setFeatures] = useState<Features>({ ai: false, naturalVoice: false, accounts: false, phoneLine: null });
   const [me, setMe] = useState<Me>(null);
   const [loaded, setLoaded] = useState(false);
 

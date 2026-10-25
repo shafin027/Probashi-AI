@@ -26,6 +26,10 @@ export function Footer() {
               <li><Link href="/check">Offer Checker</Link></li>
               <li><Link href="/cost">True Cost Calculator</Link></li>
               <li><Link href="/agency">Agency Lookup</Link></li>
+              <li><Link href="/offers">Verified offers</Link></li>
+              <li><Link href="/help">Report a problem / legal aid</Link></li>
+              <li><Link href="/premium">Premium &amp; AI phone line</Link></li>
+              <li><Link href="/partner">For licensed agencies</Link></li>
               <li><Link href="/ask">Ask in Bangla</Link></li>
               <li><Link href="/plan">Family &amp; Money Plan</Link></li>
               <li><Link href="/journey">Safety Journey</Link></li>

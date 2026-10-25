@@ -6,10 +6,17 @@
 // Triggers in the request text: TRIGGER_REFUSAL, TRIGGER_BADJSON, TRIGGER_ERROR500.
 
 import http from "node:http";
+import { WebSocketServer } from "ws";
 import { createHash } from "node:crypto";
 
 const PORT = Number(process.env.MOCK_PORT || 4010);
 const log = [];
+// Realtime SIP sideband: one socket per call_id, with every client event recorded.
+const calls = new Map();
+const callOf = (id) => {
+  if (!calls.has(id)) calls.set(id, { socket: null, received: [], closed: false });
+  return calls.get(id);
+};
 
 const ANALYSIS = {
   extracted: { documentType: "Employment contract", employer: "Al Noor Cleaning Co.", jobTitle: "Cleaner", country: "Saudi Arabia", salary: 1200, salaryCurrency: "SAR", contractMonths: 24, visaType: "work" },
@@ -59,6 +66,20 @@ const server = http.createServer((req, res) => {
     const raw = Buffer.concat(chunks);
     const url = req.url ?? "";
     if (url.startsWith("/__requests")) return send(res, 200, log);
+    const rt = /^\/__realtime\/([^/]+)(\/fn|\/close)?$/.exec(url.split("?")[0]);
+    if (rt) {
+      const c = callOf(decodeURIComponent(rt[1]));
+      if (rt[2] === "/fn") {
+        const ev = JSON.parse(raw.toString("utf8"));
+        c.socket?.send(JSON.stringify({ type: "response.function_call_arguments.done", call_id: ev.call_id, name: ev.name, arguments: JSON.stringify(ev.arguments ?? {}) }));
+        return send(res, 200, { ok: !!c.socket });
+      }
+      if (rt[2] === "/close") {
+        c.socket?.close();
+        return send(res, 200, { ok: true });
+      }
+      return send(res, 200, { connected: !!c.socket, closed: c.closed, received: c.received });
+    }
     if (url.startsWith("/__reset")) {
       log.length = 0;
       return send(res, 200, { ok: true });
@@ -90,6 +111,12 @@ const server = http.createServer((req, res) => {
       return send(res, 200, { id: "chatcmpl-1", object: "chat.completion", created: 1, model: body.model, choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content, refusal } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
     }
 
+    const sip = /^\/v1\/realtime\/calls\/([^/]+)\/(accept|reject|hangup|refer)$/.exec(url.split("?")[0]);
+    if (sip) {
+      if (sip[2] === "hangup") callOf(decodeURIComponent(sip[1])).socket?.close();
+      return send(res, 200, {});
+    }
+
     if (url.startsWith("/v1/embeddings")) {
       const inputs = Array.isArray(body.input) ? body.input : [body.input];
       return send(res, 200, { object: "list", model: body.model, data: inputs.map((t, i) => ({ object: "embedding", index: i, embedding: fakeEmbedding(t) })), usage: { prompt_tokens: 1, total_tokens: 1 } });
@@ -106,6 +133,19 @@ const server = http.createServer((req, res) => {
     }
 
     send(res, 404, { error: "unknown mock route " + url });
+  });
+});
+
+const wss = new WebSocketServer({ server, path: "/v1/realtime" });
+wss.on("connection", (socket, req) => {
+  const id = new URL(req.url, "http://x").searchParams.get("call_id");
+  const c = callOf(id);
+  c.socket = socket;
+  c.auth = req.headers.authorization ? "present" : "missing";
+  socket.on("message", (m) => c.received.push(JSON.parse(String(m))));
+  socket.on("close", () => {
+    c.closed = true;
+    c.socket = null;
   });
 });
 

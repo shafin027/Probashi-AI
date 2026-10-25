@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useFeatures } from "@/components/features.tsx";
@@ -15,6 +15,14 @@ export default function LoginPage() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [accountType, setAccountType] = useState<"worker" | "agency">("worker");
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("type") === "agency") {
+      setAccountType("agency");
+      setMode("register");
+    }
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,12 +32,13 @@ export default function LoginPage() {
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(mode === "register" ? { phone, name, password } : { phone, password }),
+        body: JSON.stringify(mode === "register" ? { phone, name, password, accountType } : { phone, password }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
       await refreshMe();
-      router.push("/ask");
+      const role = json.user?.role;
+      router.push(role === "agency" ? "/partner" : role === "legal" || role === "admin" ? "/legal" : "/ask");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -62,7 +71,16 @@ export default function LoginPage() {
         <form onSubmit={submit}>
           {mode === "register" && (
             <div className="field">
-              <label htmlFor="name">আপনার নাম · Name</label>
+              <span className="field-label">অ্যাকাউন্টের ধরন · Account type</span>
+              <div className="choice-row">
+                <button type="button" className="choice" aria-pressed={accountType === "worker"} onClick={() => setAccountType("worker")}>কর্মী/পরিবার · Worker or family</button>
+                <button type="button" className="choice" aria-pressed={accountType === "agency"} onClick={() => setAccountType("agency")}>লাইসেন্সধারী এজেন্সি · Licensed agency</button>
+              </div>
+            </div>
+          )}
+          {mode === "register" && (
+            <div className="field">
+              <label htmlFor="name">{accountType === "agency" ? "আপনার নাম (এজেন্সির প্রতিনিধি) · Your name" : "আপনার নাম · Name"}</label>
               <input id="name" autoComplete="name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
           )}

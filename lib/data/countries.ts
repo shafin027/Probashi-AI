@@ -178,6 +178,7 @@ export const HIGH_RISK_DESTINATIONS = [
 export const HELPLINES = [
   { name: "Probash Bandhu Call Centre (Expatriates' Welfare Ministry)", number: "16135" },
   { name: "National Emergency Service", number: "999" },
+  { name: "Free government legal aid (NLASO)", number: "16430" },
   { name: "BMET complaints (online)", number: "bmet.gov.bd" },
   { name: "Ami Probashi (registration, BMET clearance)", number: "amiprobashi.com" },
 ];

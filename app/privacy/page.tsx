@@ -13,7 +13,10 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>Without an account: nothing.</strong> Uploaded documents and messages are used once for your check and are never written to disk or a database.</li>
         <li><strong>With an account:</strong> your name, mobile number, a salted scrypt hash of your password (never the password itself), and, only if Memory is on, short notes about your checks and questions.</li>
-        <li>We never store document images, never sell data, and agencies never see your information.</li>
+        <li><strong>Reports (cases):</strong> what you write, the agency you name and the case timeline. Only you and our legal-aid caseworkers can see a case; they see your name and number only if you allowed them to contact you. Internal staff notes are never shown to agencies.</li>
+        <li><strong>Reviews:</strong> shown publicly with only your first initial; phone, email, passport and NID numbers are removed automatically. An agency sees the name you gave on a placement claim so it can confirm it.</li>
+        <li><strong>Phone line:</strong> calls are answered by an AI voice. We don&apos;t keep recordings or transcripts; the call record stores a salted hash of your number and which actions were taken. Your phone PIN is stored only as a salted hash.</li>
+        <li>We never store document images, never sell data, and agencies never see your checks or questions.</li>
         <li>To improve the safety journey we count anonymous events (for example “a step was completed”). These are totals only, with no user ID or IP address stored.</li>
         <li>Memory can be turned off (which erases it), single memories can be deleted, and the whole account can be deleted from the Account page.</li>
       </ul>

@@ -108,6 +108,23 @@ export default function AccountPage() {
         )}
       </div>
 
+      <div className="card">
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <div>
+            <h3 style={{ margin: 0 }}>{me.premium ? "⭐ প্রিমিয়াম সদস্য · Premium" : "ফ্রি সদস্য · Free plan"}</h3>
+            <p className="small muted" style={{ margin: "4px 0 0" }}>
+              {me.premium ? `Caseworker for every report and the AI phone line, until ${me.premiumUntil?.slice(0, 10)}.` : "Upgrade for a legal-aid caseworker and the AI phone line."}
+            </p>
+          </div>
+          {!me.premium && me.role === "worker" && <Link className="btn btn-sm" href="/premium">প্রিমিয়াম · Upgrade</Link>}
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <Link href="/help">আমার রিপোর্ট · My reports</Link>
+        </div>
+      </div>
+
+      {me.premium && <PhonePin hasPin={me.hasPhonePin} onChange={refreshMe} />}
+
       <div className="card danger-zone">
         <h3>অ্যাকাউন্ট মুছুন · Delete account</h3>
         <p className="small muted">Permanently deletes your account, sessions and all memories. This cannot be undone.</p>
@@ -129,6 +146,44 @@ export default function AccountPage() {
           <button className="btn btn-danger-outline" onClick={() => setConfirmDelete(true)}>অ্যাকাউন্ট মুছুন · Delete my account</button>
         )}
       </div>
+    </div>
+  );
+}
+
+function PhonePin({ hasPin, onChange }: { hasPin: boolean; onChange: () => Promise<void> }) {
+  const { phoneLine } = useFeatures();
+  const [pin, setPin] = useState("");
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  async function save(value: string | null) {
+    setErr("");
+    setMsg("");
+    // Same rule as the server, checked here first so a trivial PIN never leaves the device.
+    if (value !== null && (/^(\d)\1+$/.test(value) || "0123456789".includes(value) || "9876543210".includes(value))) {
+      return setErr("Choose a PIN that isn't a simple pattern (not 1234, 0000…)");
+    }
+    const res = await fetch("/api/account", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ phonePin: value }) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return setErr(json.error ?? "Could not save");
+    setPin("");
+    setMsg(value ? "পিন সেট হয়েছে · PIN saved" : "পিন মুছে ফেলা হয়েছে · PIN removed");
+    await onChange();
+  }
+  return (
+    <div className="card">
+      <h3 style={{ margin: 0 }}>📞 ফোন লাইনের পিন · Phone-line PIN</h3>
+      <p className="small muted" style={{ margin: "4px 0 8px" }}>
+        The AI phone agent{phoneLine ? ` (${phoneLine})` : ""} asks for this PIN to identify you. Use 4–6 digits that are not your bKash, bank or SIM PIN.
+        {hasPin ? " A PIN is set." : " No PIN set yet."}
+      </p>
+      <form className="row" onSubmit={(e) => { e.preventDefault(); void save(pin); }}>
+        <label htmlFor="phone-pin" className="sr-only">New phone PIN</label>
+        <input id="phone-pin" type="password" inputMode="numeric" autoComplete="off" pattern="[0-9]{4,6}" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" style={{ width: 140 }} />
+        <button className="btn btn-sm" disabled={pin.length < 4}>{hasPin ? "পিন বদলান · Change" : "পিন সেট করুন · Set PIN"}</button>
+        {hasPin && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void save(null)}>মুছুন · Remove</button>}
+      </form>
+      {msg && <p role="status" className="small" style={{ color: "var(--safe)" }}>{msg}</p>}
+      {err && <p role="alert" className="small" style={{ color: "var(--danger)" }}>{err}</p>}
     </div>
   );
 }

@@ -4,7 +4,8 @@ import { aiEnabled, analyse } from "@/lib/ai.ts";
 import type { Analysis, DocImage } from "@/lib/prompts.ts";
 import { currentUser } from "@/lib/auth.ts";
 import { remember } from "@/lib/memory.ts";
-import { bumpStat } from "@/lib/db.ts";
+import { bumpStat, getDb } from "@/lib/db.ts";
+import { resolveAgency } from "@/lib/marketplace.ts";
 import { COUNTRIES } from "@/lib/data/countries.ts";
 import { clientIp, rateLimit, withinDailyAiBudget } from "@/lib/ratelimit.ts";
 import { assertSameOrigin, clampText, errorResponse, HttpError, json, readJson, validateUpload } from "@/lib/security.ts";
@@ -81,7 +82,10 @@ export async function POST(req: Request) {
     let doc: DocImage | undefined;
     if (body.doc) doc = { mediaType: validateUpload(body.doc.mediaType, body.doc.data, MAX_DOC_BYTES), data: body.doc.data };
 
+    // With a database, agencies are checked against the imported official licence list
+    // (plus verified reviews and substantiated complaints); without one, the demo list.
     const input: OfferInput = body.input;
+    if (input.agencyQuery?.trim() && (await getDb())) input.resolvedAgency = await resolveAgency(input.agencyQuery);
     let rules = analyseOffer(input);
 
     let ai: Analysis | null = null;

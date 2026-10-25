@@ -7,6 +7,7 @@
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHmac, randomUUID } from "node:crypto";
 
 const A = "http://localhost:3200";
 const B = "http://localhost:3201";
@@ -238,7 +239,7 @@ describe("no AI configured", () => {
     assert.equal((await call(C, "/api/voice/tts", { body: { text: "হ্যালো" } })).status, 503);
     assert.equal((await call(C, "/api/auth/register", { body: { phone: "01712345678", name: "X", password: "goodpass99" } })).status, 503);
     const cfg = await call(C, "/api/config", { method: "GET" });
-    assert.deepEqual(cfg.json, { ai: false, naturalVoice: false, accounts: false });
+    assert.deepEqual(cfg.json, { ai: false, naturalVoice: false, accounts: false, phoneLine: null });
   });
   test("public health check reveals nothing", async () => {
     const h = await call(C, "/api/health", { method: "GET" });
@@ -473,5 +474,371 @@ describe("gamification measurement (aggregate events)", () => {
     assert.ok(j.funnel.events["milestone:true_cost"] >= 1);
     const wrong = await fetch(`${A}/api/health`, { headers: { "x-health-token": "health-token-for-tests-XXXXXX" } });
     assert.deepEqual(await wrong.json(), { ok: true });
+  });
+});
+
+// ---------------------------------------------------------------- marketplace, cases, phone line
+
+let phoneSeq = 0;
+const uniquePhone = (prefix = "0161") => `${prefix}${String(9000000 + ++phoneSeq).padStart(7, "0")}`.slice(0, 11);
+async function account(base, { phone = uniquePhone(), name = "Test User", accountType } = {}) {
+  const res = await call(base, "/api/auth/register", { body: { phone, name, password: "correct horse battery", ...(accountType ? { accountType } : {}) } });
+  if (res.status === 409) {
+    const login = await call(base, "/api/auth/login", { body: { phone, password: "correct horse battery" } });
+    return { cookie: cookieFrom(login), phone, user: login.json.user };
+  }
+  assert.equal(res.status, 201, res.text);
+  return { cookie: cookieFrom(res), phone, user: res.json.user };
+}
+const staff = () => account(A, { phone: "01900000001", name: "Nasrin Legal" });
+const admin = () => account(A, { phone: "01900000002", name: "Admin" });
+
+describe("agency registration against the official licence list", () => {
+  test("auto-verified when RL, name and official phone all match", async () => {
+    const ag = await account(A, { phone: "01710001001", name: "Shapla Rep", accountType: "agency" });
+    assert.equal(ag.user.role, "agency");
+    const res = await call(A, "/api/partner/agency", { cookie: ag.cookie, body: { rl: "rl 1001", name: "Shapla Overseas", contactPhone: "01710001001", address: "Dhaka" } });
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.json.agency.status, "verified");
+    assert.equal(res.json.agency.rl_number, "RL-1001");
+    assert.equal(res.json.agency.name, "Shapla Overseas (demo)", "uses the official name");
+  });
+
+  test("the same RL can't be claimed twice; suspended or unknown licences can't register", async () => {
+    const other = await account(A, { accountType: "agency" });
+    assert.equal((await call(A, "/api/partner/agency", { cookie: other.cookie, body: { rl: "RL-1001", name: "Shapla Overseas", contactPhone: other.phone, address: "" } })).status, 409);
+    const suspended = await call(A, "/api/partner/agency", { cookie: other.cookie, body: { rl: "RL-1003", name: "Padma Global HR", contactPhone: other.phone, address: "" } });
+    assert.equal(suspended.status, 422);
+    assert.match(suspended.json.error, /suspended/);
+    assert.equal((await call(A, "/api/partner/agency", { cookie: other.cookie, body: { rl: "RL-9999", name: "Fake Agency", contactPhone: other.phone, address: "" } })).status, 422);
+  });
+
+  test("a phone that doesn't match the official record waits for staff, who can verify it", async () => {
+    const ag = await account(A, { accountType: "agency", name: "Meghna Rep" });
+    const res = await call(A, "/api/partner/agency", { cookie: ag.cookie, body: { rl: "RL-1002", name: "Meghna Manpower", contactPhone: ag.phone, address: "Cumilla" } });
+    assert.equal(res.status, 201);
+    assert.equal(res.json.agency.status, "pending");
+    const blockedOffer = await call(A, "/api/partner/offers", { cookie: ag.cookie, body: { countryCode: "SA", jobTitle: "Driver", employer: "X", salaryLocal: 1500, totalCostBdt: 150000, contractMonths: 24, seats: 2, details: "" } });
+    assert.equal(blockedOffer.status, 403, "pending agencies can't publish");
+    const worker = await account(A);
+    assert.equal((await call(A, "/api/legal/agencies", { method: "PATCH", cookie: worker.cookie, body: { id: res.json.agency.id, decision: "verified" } })).status, 403);
+    const s = await staff();
+    assert.equal(s.user.role, "legal");
+    const dash = await call(A, "/api/legal", { method: "GET", cookie: s.cookie });
+    assert.ok(dash.json.agencies.some((a) => a.rl_number === "RL-1002"));
+    assert.equal((await call(A, "/api/legal/agencies", { method: "PATCH", cookie: s.cookie, body: { id: res.json.agency.id, decision: "verified" } })).status, 200);
+    assert.equal((await call(A, "/api/partner", { method: "GET", cookie: ag.cookie })).json.agency.status, "verified");
+  });
+
+  test("workers can't use agency endpoints", async () => {
+    const w = await account(A);
+    assert.equal((await call(A, "/api/partner", { method: "GET", cookie: w.cookie })).status, 403);
+    assert.equal((await call(A, "/api/partner/agency", { cookie: w.cookie, body: { rl: "RL-1005", name: "Sundarban", contactPhone: w.phone, address: "" } })).status, 403);
+  });
+});
+
+describe("verified offers", () => {
+  test("offers inside the government ceiling go live; overpriced or free-visa offers are blocked", async () => {
+    const ag = await account(A, { phone: "01710001001", accountType: "agency" });
+    const ok = await call(A, "/api/partner/offers", { cookie: ag.cookie, body: { countryCode: "SA", jobTitle: "Cleaner", employer: "Al Noor Cleaning Co.", salaryLocal: 1200, totalCostBdt: 160000, contractMonths: 24, seats: 10, details: "Food and housing provided" } });
+    assert.equal(ok.status, 201, ok.text);
+    assert.equal(ok.json.offer.status, "live");
+    const pricey = await call(A, "/api/partner/offers", { cookie: ag.cookie, body: { countryCode: "SA", jobTitle: "Cleaner", employer: "Al Noor", salaryLocal: 1200, totalCostBdt: 480000, contractMonths: 24, seats: 10, details: "" } });
+    assert.equal(pricey.status, 200);
+    assert.equal(pricey.json.published, false);
+    assert.ok(pricey.json.offer.check_result.reasons.some((r) => /ceiling/.test(r.en)));
+    const free = await call(A, "/api/partner/offers", { cookie: ag.cookie, body: { countryCode: "SA", jobTitle: "Helper", employer: "Any", salaryLocal: 1000, totalCostBdt: 100000, contractMonths: 24, seats: 1, details: "Azad visa, change job anytime" } });
+    assert.equal(free.json.published, false);
+    const list = await call(A, "/api/offers?country=SA", { method: "GET" });
+    assert.equal(list.status, 200);
+    assert.ok(list.json.offers.some((o) => o.job_title === "Cleaner" && o.agency.rl === "RL-1001"));
+    assert.ok(!list.json.offers.some((o) => o.total_cost_bdt === 480000 || o.job_title === "Helper"), "blocked offers never listed");
+    assert.equal(typeof list.json.offers[0].agency.trust.score, "number");
+    assert.equal(list.json.offers[0].check_result, undefined, "internal check data not exposed");
+  });
+
+  test("offer input is validated strictly", async () => {
+    const ag = await account(A, { phone: "01710001001", accountType: "agency" });
+    assert.equal((await call(A, "/api/partner/offers", { cookie: ag.cookie, body: { countryCode: "XX", jobTitle: "x", employer: "", salaryLocal: -1, totalCostBdt: 1, contractMonths: 1, seats: 0, details: "" } })).status, 400);
+    assert.equal((await call(A, "/api/partner/offers", { cookie: ag.cookie, origin: "https://evil.example", body: {} })).status, 403);
+  });
+});
+
+describe("worker reviews need a confirmed placement", () => {
+  test("claim -> review held -> agency confirms -> review public and counted", async () => {
+    const profile = await call(A, "/api/agencies/RL-1001", { method: "GET" });
+    assert.equal(profile.status, 200);
+    const agencyId = profile.json.profile.id;
+    const w = await account(A, { name: "Karim Uddin" });
+    const early = await call(A, "/api/reviews", { cookie: w.cookie, body: { agencyId, rating: 5, promiseKept: true, costPaidBdt: 160000, body: "Very good agency, they kept every promise." } });
+    assert.equal(early.status, 403, "no review without a placement");
+    const claim = await call(A, "/api/placements", { cookie: w.cookie, body: { agencyId, countryCode: "SA", year: 2025, evidence: "smart card ends 4411, call me 01712345678" } });
+    assert.equal(claim.status, 201);
+    assert.equal(claim.json.placement.status, "pending");
+    const review = await call(A, "/api/reviews", { cookie: w.cookie, body: { agencyId, rating: 4, promiseKept: true, costPaidBdt: 160000, body: "Job and salary were as promised. Call me on 01712345678." } });
+    assert.equal(review.status, 201);
+    assert.equal(review.json.visible, false);
+    assert.equal((await call(A, "/api/agencies/RL-1001", { method: "GET" })).json.reviews.length, 0, "held until confirmed");
+
+    const ag = await account(A, { phone: "01710001001", accountType: "agency" });
+    const dash = await call(A, "/api/partner", { method: "GET", cookie: ag.cookie });
+    const p = dash.json.placements.find((x) => x.worker === "Karim Uddin");
+    assert.ok(p && !p.evidence.includes("01712345678"), "evidence scrubbed");
+    assert.equal((await call(A, "/api/partner/placements", { cookie: ag.cookie, body: { id: p.id, action: "confirm" } })).status, 200);
+    assert.equal((await call(A, "/api/partner/placements", { cookie: ag.cookie, body: { id: p.id, action: "dispute" } })).status, 404, "decided placements can't be flipped");
+
+    const after = await call(A, "/api/agencies/RL-1001", { method: "GET" });
+    assert.equal(after.json.reviews.length, 1);
+    assert.ok(!after.json.reviews[0].body.includes("01712345678"), "phone number removed from review");
+    assert.equal(after.json.reviews[0].worker, "K.", "only an initial is shown");
+    assert.equal(after.json.trust.reviewCount, 1);
+
+    const reply = await call(A, "/api/partner/reply", { cookie: ag.cookie, body: { reviewId: after.json.reviews[0].id, reply: "Thank you, safe travels!" } });
+    assert.equal(reply.status, 200);
+    assert.equal((await call(A, "/api/partner/reply", { cookie: ag.cookie, body: { reviewId: after.json.reviews[0].id, reply: "Second reply" } })).status, 404, "one reply only");
+  });
+
+  test("disputed placements go to staff; agencies can't review themselves", async () => {
+    const agencyId = (await call(A, "/api/agencies/RL-1001", { method: "GET" })).json.profile.id;
+    const w = await account(A, { name: "Disputed Worker" });
+    await call(A, "/api/placements", { cookie: w.cookie, body: { agencyId, countryCode: "AE", year: 2024, evidence: "" } });
+    const ag = await account(A, { phone: "01710001001", accountType: "agency" });
+    const p = (await call(A, "/api/partner", { method: "GET", cookie: ag.cookie })).json.placements.find((x) => x.worker === "Disputed Worker");
+    await call(A, "/api/partner/placements", { cookie: ag.cookie, body: { id: p.id, action: "dispute" } });
+    const s = await staff();
+    const q = await call(A, "/api/legal", { method: "GET", cookie: s.cookie });
+    assert.ok(q.json.placements.some((x) => x.id === p.id && x.status === "disputed"));
+    assert.equal((await call(A, "/api/legal/placements", { method: "PATCH", cookie: s.cookie, body: { id: p.id, decision: "confirmed" } })).status, 200);
+    assert.equal((await call(A, "/api/placements", { cookie: ag.cookie, body: { agencyId, countryCode: "SA", year: 2025, evidence: "" } })).status, 403);
+  });
+});
+
+describe("reports and the legal-aid team", () => {
+  test("free non-emergency reports get official channels; emergencies go to a caseworker", async () => {
+    const w = await account(A, { name: "Rahima Begum" });
+    const free = await call(A, "/api/cases", { cookie: w.cookie, body: { category: "overcharge", description: "The agency took 5 lakh taka for Saudi, the legal limit is much lower.", agency: "RL-1001", amountLostBdt: 335000, whereNow: "bangladesh", countryCode: "SA", urgent: false, consentContact: true } });
+    assert.equal(free.status, 201, free.text);
+    assert.equal(free.json.case.tier, "self_help");
+    assert.match(free.json.case.ref, /^PA-\d{4}-[A-Z0-9]{5}$/);
+    assert.ok(free.json.referrals.some((r) => r.contact === "bmet.gov.bd"));
+    const urgent = await call(A, "/api/cases", { cookie: w.cookie, body: { category: "passport_withheld", description: "My employer took my passport and does not pay my salary for 3 months.", agency: "", amountLostBdt: null, whereNow: "abroad", countryCode: "SA", urgent: false, consentContact: true } });
+    assert.equal(urgent.json.case.tier, "legal_aid");
+    assert.equal(urgent.json.case.urgent, true);
+
+    const s = await staff();
+    const queue = await call(A, "/api/legal", { method: "GET", cookie: s.cookie });
+    assert.ok(queue.json.cases.some((c) => c.ref === urgent.json.case.ref));
+    assert.ok(!queue.json.cases.some((c) => c.ref === free.json.case.ref), "self-help cases are not in the caseworker queue");
+
+    // Upgrading forwards the earlier self-help report.
+    const up = await call(A, "/api/premium", { cookie: w.cookie, body: { plan: "monthly" } });
+    assert.equal(up.status, 200);
+    assert.equal(up.json.user.premium, true);
+    assert.equal(up.json.forwarded, 1);
+    const queue2 = await call(A, "/api/legal", { method: "GET", cookie: s.cookie });
+    assert.ok(queue2.json.cases.some((c) => c.ref === free.json.case.ref));
+  });
+
+  test("caseworker messages reach the worker; internal notes never do; strangers see nothing", async () => {
+    const w = await account(A, { name: "Case Owner" });
+    await call(A, "/api/premium", { cookie: w.cookie, body: { plan: "yearly" } });
+    const c = await call(A, "/api/cases", { cookie: w.cookie, body: { category: "fake_job", description: "There was no job when I arrived, the broker disappeared with my money.", agency: "RL-1001", amountLostBdt: 300000, whereNow: "abroad", countryCode: "MY", urgent: false, consentContact: true } });
+    const ref = c.json.case.ref;
+    assert.equal(c.json.case.tier, "legal_aid");
+    const s = await staff();
+    const detail = await call(A, `/api/cases/${ref}`, { method: "GET", cookie: s.cookie });
+    assert.equal(detail.json.reporter.name, "Case Owner", "staff see contact details when consented");
+    assert.equal((await call(A, `/api/legal/cases/${ref}`, { method: "PATCH", cookie: s.cookie, body: { assignToMe: true, message: "আমি আপনার কেস দেখছি। রসিদের ছবি পাঠান।", note: "INTERNAL: agency has 2 similar complaints" } })).status, 200);
+    assert.equal((await call(A, `/api/legal/cases/${ref}`, { method: "PATCH", cookie: s.cookie, body: { substantiated: true, status: "in_progress" } })).status, 200);
+
+    const mine = await call(A, `/api/cases/${ref}`, { method: "GET", cookie: w.cookie });
+    assert.equal(mine.json.case.status, "in_progress");
+    assert.ok(mine.json.events.some((e) => e.body.includes("রসিদের ছবি")));
+    assert.ok(!mine.json.events.some((e) => e.body.includes("INTERNAL")), "internal note hidden from worker");
+    assert.equal(mine.json.reporter, undefined);
+    assert.equal((await call(A, `/api/cases/${ref}`, { cookie: w.cookie, body: { message: "ছবি পাঠালাম" } })).status, 201);
+
+    const stranger = await account(A);
+    assert.equal((await call(A, `/api/cases/${ref}`, { method: "GET", cookie: stranger.cookie })).status, 404);
+    assert.equal((await call(A, `/api/legal/cases/${ref}`, { method: "PATCH", cookie: stranger.cookie, body: { status: "closed" } })).status, 403);
+
+    // A substantiated complaint now counts against the agency's public score.
+    const profile = await call(A, "/api/agencies/RL-1001", { method: "GET" });
+    assert.ok(profile.json.trust.reasons.some((r) => /substantiated/.test(r.en)));
+  });
+
+  test("reports require login and validate input", async () => {
+    assert.equal((await call(A, "/api/cases", { body: { category: "abuse" } })).status, 401);
+    const w = await account(A);
+    assert.equal((await call(A, "/api/cases", { cookie: w.cookie, body: { category: "bogus", description: "x", agency: "", amountLostBdt: null, whereNow: "bangladesh", countryCode: "", urgent: false, consentContact: true } })).status, 400);
+    assert.equal((await call(A, "/api/cases", { cookie: w.cookie, body: { category: "other", description: "short", agency: "", amountLostBdt: null, whereNow: "bangladesh", countryCode: "", urgent: false, consentContact: true } })).status, 400);
+  });
+
+  test("offer checks use the live licence list", async () => {
+    const res = await call(A, "/api/analyze", { body: { input: { countryCode: "SA", agencyQuery: "RL-1003", askedCostBdt: 150000 } } });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.agency.licenceStatus, "suspended");
+    assert.ok(res.json.flags.some((f) => f.id === "agency-licence"));
+    const ok = await call(A, "/api/analyze", { body: { input: { countryCode: "SA", agencyQuery: "Shapla Overseas" } } });
+    assert.equal(ok.json.agency.rl, "RL-1001");
+    assert.equal(typeof ok.json.agency.trust.score, "number");
+  });
+});
+
+// Standard Webhooks signature, exactly as OpenAI signs realtime.call.incoming.
+const WEBHOOK_SECRET = "whsec_dGVzdC13ZWJob29rLXNlY3JldC0wMTIzNDU2Nzg5YWJjZGVm";
+function signedCall(callId, from, secret = WEBHOOK_SECRET) {
+  const body = JSON.stringify({ id: `evt_${callId}`, object: "event", created_at: Math.floor(Date.now() / 1000), type: "realtime.call.incoming", data: { call_id: callId, sip_headers: [{ name: "From", value: `"Caller" <sip:${from}@pstn.example>;tag=1` }, { name: "To", value: "<sip:proj@sip.api.openai.com>" }] } });
+  const id = `msg_${callId}`;
+  const ts = String(Math.floor(Date.now() / 1000));
+  const key = Buffer.from(secret.slice(6), "base64");
+  const sig = createHmac("sha256", key).update(`${id}.${ts}.${body}`).digest("base64");
+  return { raw: body, headers: { "content-type": "application/json", "webhook-id": id, "webhook-timestamp": ts, "webhook-signature": `v1,${sig}` }, origin: null };
+}
+const rtState = async (callId) => (await fetch(`${MOCK}/__realtime/${callId}`)).json();
+const rtFn = (callId, name, args) => fetch(`${MOCK}/__realtime/${callId}/fn`, { method: "POST", body: JSON.stringify({ call_id: `fc_${randomUUID()}`, name, arguments: args }) });
+async function waitFor(fn, ms = 8000) {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() > end) throw new Error("timed out");
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+async function toolOutput(callId, name, args) {
+  const before = (await rtState(callId)).received.length;
+  await rtFn(callId, name, args);
+  const ev = await waitFor(async () => (await rtState(callId)).received.slice(before).find((e) => e.type === "conversation.item.create"));
+  return { output: JSON.parse(ev.item.output), events: (await rtState(callId)).received.slice(before) };
+}
+
+describe("AI phone line (OpenAI Realtime SIP)", () => {
+  test("PIN needs Premium and must not be trivial", async () => {
+    const w = await account(A);
+    assert.equal((await call(A, "/api/account", { method: "PATCH", cookie: w.cookie, body: { phonePin: "4827" } })).status, 402);
+    await call(A, "/api/premium", { cookie: w.cookie, body: { plan: "monthly" } });
+    assert.equal((await call(A, "/api/account", { method: "PATCH", cookie: w.cookie, body: { phonePin: "1234" } })).status, 400);
+    assert.equal((await call(A, "/api/account", { method: "PATCH", cookie: w.cookie, body: { phonePin: "4827" } })).status, 200);
+    assert.equal((await call(A, "/api/auth/me", { method: "GET", cookie: w.cookie })).json.user.hasPhonePin, true);
+  });
+
+  test("unsigned or tampered webhooks are refused; the phone line is off where not configured", async () => {
+    const good = signedCall("rtc_forged", "+8801711111111");
+    assert.equal((await call(A, "/api/phone/incoming", { raw: good.raw, headers: { ...good.headers, "webhook-signature": "v1,AAAA" }, origin: null })).status, 401);
+    assert.equal((await call(A, "/api/phone/incoming", { raw: good.raw.replace("rtc_forged", "rtc_other"), headers: good.headers, origin: null })).status, 401);
+    const wrong = signedCall("rtc_wrongkey", "+8801711111111", "whsec_" + Buffer.from("another-secret-another-secret-12").toString("base64"));
+    assert.equal((await call(A, "/api/phone/incoming", { raw: wrong.raw, headers: wrong.headers, origin: null })).status, 401);
+    const off = signedCall("rtc_off", "+8801711111111");
+    assert.equal((await call(B, "/api/phone/incoming", { raw: off.raw, headers: off.headers, origin: null })).status, 503);
+  });
+
+  test("a full call: accept, PIN identification, memory, case filing, agency check, hang up", async () => {
+    await resetMock();
+    const w = await account(A, { name: "Jamal Hossain" });
+    await call(A, "/api/premium", { cookie: w.cookie, body: { plan: "monthly" } });
+    await call(A, "/api/account", { method: "PATCH", cookie: w.cookie, body: { phonePin: "4827" } });
+    await call(A, "/api/ask", { cookie: w.cookie, body: { messages: [{ role: "user", content: "I am going to Saudi Arabia as a driver in March" }] } });
+
+    const callId = `rtc_${randomUUID().replace(/-/g, "")}`;
+    const hook = signedCall(callId, `+88${w.phone}`);
+    const res = await call(A, "/api/phone/incoming", { raw: hook.raw, headers: hook.headers, origin: null });
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.json.accepted, callId);
+
+    const accept = (await mockRequests()).find((r) => r.path === `/v1/realtime/calls/${callId}/accept`);
+    assert.ok(accept, "call accepted via the Realtime API");
+    assert.equal(accept.body.type, "realtime");
+    assert.match(accept.body.instructions, /registered with us/);
+    assert.match(accept.body.instructions, /NOT a bKash/);
+    assert.ok(!accept.body.instructions.includes("Jamal"), "no account data before identification");
+    assert.deepEqual(accept.body.tools.map((t) => t.name).sort(), ["check_agency", "check_offer", "end_call", "my_cases", "remember_fact", "report_issue", "transfer_to_human", "verify_identity"]);
+    assert.equal(accept.body.audio.input.transcription.language, "bn");
+
+    const st = await waitFor(async () => {
+      const s = await rtState(callId);
+      return s.connected && s.received.length ? s : null;
+    });
+    assert.equal(st.received[0].type, "response.create", "agent greets first");
+
+    const before = await toolOutput(callId, "my_cases", {});
+    assert.equal(before.output.error, "not_verified");
+    const bad = await toolOutput(callId, "verify_identity", { pin: "1111" });
+    assert.equal(bad.output.verified, false);
+    assert.equal(bad.output.attempts_left, 2);
+
+    const good = await toolOutput(callId, "verify_identity", { pin: "4827" });
+    assert.equal(good.output.verified, true);
+    assert.equal(good.output.name, "Jamal Hossain");
+    const update = good.events.find((e) => e.type === "session.update");
+    assert.ok(update, "instructions updated after identification");
+    assert.match(update.session.instructions, /VERIFIED as Jamal Hossain/);
+    assert.match(update.session.instructions, /Saudi Arabia as a driver/, "vector memory recalled on the call");
+
+    const agency = await toolOutput(callId, "check_agency", { query: "RL-1003" });
+    assert.equal(agency.output.found, true);
+    assert.equal(agency.output.licence, "suspended");
+
+    const offer = await toolOutput(callId, "check_offer", { country_code: "SA", asked_cost_bdt: 650000, visa_type: "free", paid_to: "individual" });
+    assert.equal(offer.output.verdict, "danger");
+
+    const filed = await toolOutput(callId, "report_issue", { category: "wage_theft", description: "My employer has not paid me for two months. I am in Riyadh.", where_now: "abroad", country_code: "SA" });
+    assert.match(filed.output.ref, /^PA-/);
+    assert.equal(filed.output.forwarded_to_caseworker, true);
+    const cases = await call(A, "/api/cases", { method: "GET", cookie: w.cookie });
+    assert.ok(cases.json.cases.some((c) => c.ref === filed.output.ref), "case visible on the website");
+    const status = await toolOutput(callId, "my_cases", {});
+    assert.match(status.output.cases, new RegExp(filed.output.ref));
+
+    const transfer = await toolOutput(callId, "transfer_to_human", { reason: "wants a caseworker" });
+    assert.equal(transfer.output.transferred, true);
+    await waitFor(async () => (await mockRequests()).some((r) => r.path === `/v1/realtime/calls/${callId}/refer` && r.body.target_uri === "tel:+8809610000000"), 8000);
+
+    await toolOutput(callId, "end_call", {});
+    await waitFor(async () => (await mockRequests()).some((r) => r.path === `/v1/realtime/calls/${callId}/hangup`), 10000);
+  });
+
+  test("three wrong PINs end the call; unknown numbers must give their registered number", async () => {
+    await resetMock();
+    const callId = `rtc_${randomUUID().replace(/-/g, "")}`;
+    const hook = signedCall(callId, "+8801399999999");
+    assert.equal((await call(A, "/api/phone/incoming", { raw: hook.raw, headers: hook.headers, origin: null })).status, 200);
+    const accept = (await mockRequests()).find((r) => r.path === `/v1/realtime/calls/${callId}/accept`);
+    assert.match(accept.body.instructions, /not recognised/);
+    await waitFor(async () => (await rtState(callId)).connected);
+    for (let i = 0; i < 3; i++) {
+      const r = await toolOutput(callId, "verify_identity", { pin: "9876", phone: "01399999999" });
+      assert.equal(r.output.verified, false);
+    }
+    const locked = await toolOutput(callId, "verify_identity", { pin: "4827" });
+    assert.equal(locked.output.locked, true);
+    await waitFor(async () => (await mockRequests()).some((r) => r.path === `/v1/realtime/calls/${callId}/hangup`), 10000);
+  });
+});
+
+describe("licence list import and daily re-verification", () => {
+  test("only admins can import; a cancelled licence suspends the agency and hides its offers", async () => {
+    const s = await staff();
+    const csv = "RL No,Agency Name,Status,Valid Until,Address,Phone\nRL-1001,Shapla Overseas (demo),Cancelled,31/12/2027,Dhaka,01710001001\nRL-1002,Meghna Manpower (demo),Active,31/12/2027,Cumilla,\nRL-1003,Padma Global HR (demo),Suspended,30/06/2025,Sylhet,\n";
+    assert.equal((await call(A, "/api/admin/registry", { cookie: s.cookie, body: { csv, source: "test import" } })).status, 403);
+    const a = await admin();
+    assert.equal(a.user.role, "admin");
+    const res = await call(A, "/api/admin/registry", { cookie: a.cookie, body: { csv, source: "RAIMS export (test)" } });
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.json.report.imported, 3);
+    assert.ok(res.json.reverify.suspended >= 1);
+    const offers = await call(A, "/api/offers", { method: "GET" });
+    assert.ok(!offers.json.offers.some((o) => o.agency.rl === "RL-1001"), "offers of a cancelled agency disappear");
+    const prof = await call(A, "/api/agencies/RL-1001", { method: "GET" });
+    assert.equal(prof.json.trust.level, "danger");
+    assert.equal((await call(A, "/api/agencies/RL-1005", { method: "GET" })).status, 404, "agencies dropped from the official list are gone");
+  });
+
+  test("the cron endpoint needs the cron secret", async () => {
+    assert.equal((await call(A, "/api/cron/reverify", { method: "GET" })).status, 401);
+    assert.equal((await call(A, "/api/cron/reverify", { method: "GET", headers: { authorization: "Bearer wrong" } })).status, 401);
+    const ok = await call(A, "/api/cron/reverify", { method: "GET", headers: { authorization: "Bearer cron-secret-for-tests-0123456789" } });
+    assert.equal(ok.status, 200);
+    assert.equal(typeof ok.json.checked, "number");
   });
 });

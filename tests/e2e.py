@@ -18,7 +18,7 @@ BASE = os.environ.get("BASE_URL", "http://localhost:3300")
 NO_AI = os.environ.get("NO_AI_URL", "http://localhost:3301")
 HERE = os.path.dirname(os.path.abspath(__file__))
 AXE = os.path.join(HERE, "..", "node_modules", "axe-core", "axe.min.js")
-PAGES = ["/", "/check", "/cost", "/agency", "/ask", "/plan", "/quiz", "/journey", "/login", "/privacy", "/about"]
+PAGES = ["/", "/check", "/cost", "/agency", "/agency/RL-1001", "/offers", "/help", "/premium", "/partner", "/ask", "/plan", "/quiz", "/journey", "/login", "/privacy", "/about"]
 
 # Ground truth for the quiz, read from the app's own data (not from the page).
 SCENARIOS = json.loads(subprocess.check_output(
@@ -192,7 +192,7 @@ with sync_playwright() as p:
         page.screenshot(path=f"{SHOTS}/{name}-ask.png", full_page=True)
 
         # ---------- Other pages ----------
-        for path, marker in [("/cost", "৳78,990"), ("/agency", "Demo directory"), ("/plan", "Debt-free in"), ("/privacy", "How it is protected"), ("/about", "Business model with checks and balances")]:
+        for path, marker in [("/cost", "৳78,990"), ("/agency", "সরকারি তালিকা"), ("/offers", "যাচাইকৃত অফার"), ("/premium", "প্রবাসী সুরক্ষা প্রিমিয়াম"), ("/plan", "Debt-free in"), ("/privacy", "How it is protected"), ("/about", "Business model with checks and balances")]:
             page.goto(f"{BASE}{path}")
             page.wait_for_load_state("networkidle")
             check(marker in page.content(), f"[{name}] {path} renders")
@@ -268,6 +268,51 @@ with sync_playwright() as p:
         check(synced >= end_pts, f"[{name}] readiness synced to a second device via the account ({synced})")
         other.close()
 
+        # ---------- Agency check against the licence list ----------
+        page.goto(f"{BASE}/agency")
+        page.wait_for_load_state("networkidle")
+        page.locator("#agency-q").fill("RL-1003")
+        page.get_by_role("button", name="খুঁজুন · Search").click()
+        page.wait_for_selector("text=লাইসেন্স স্থগিত", timeout=15000)
+        check(page.locator(".ring.sm").count() >= 1, f"[{name}] agency search shows licence status and a confidence score")
+        page.locator(".card-link").first.click()
+        page.wait_for_url("**/agency/RL-1003", timeout=15000)
+        page.wait_for_selector("text=This agency cannot legally recruit right now", timeout=15000)
+        check(True, f"[{name}] agency profile warns about a suspended licence")
+
+        # ---------- Report a problem (emergency goes to a caseworker, free) ----------
+        page.goto(f"{BASE}/help")
+        page.wait_for_selector("#cs-cat", timeout=15000)
+        page.locator("#cs-cat").select_option("passport_withheld")
+        page.get_by_role("button", name="বিদেশে · Abroad").click()
+        page.locator("#cs-country").select_option("SA")
+        page.locator("#cs-desc").fill("আমার মালিক পাসপোর্ট রেখে দিয়েছে এবং তিন মাস বেতন দেয়নি।")
+        check(page.get_by_text("legal-aid caseworker").count() >= 1, f"[{name}] emergency report is shown as going to a caseworker")
+        page.get_by_role("button", name="রিপোর্ট পাঠান · Submit report").click()
+        page.wait_for_selector("text=রিপোর্ট জমা হয়েছে", timeout=15000)
+        ref = page.locator("strong", has_text="PA-").first.inner_text().strip()
+        check(ref.startswith("PA-"), f"[{name}] report filed with a reference ({ref})")
+        check(page.get_by_text("+8809610102030").count() >= 1, f"[{name}] official channels for workers abroad shown")
+        page.get_by_role("link", name="কেস দেখুন · Open case").click()
+        page.wait_for_url(f"**/help/{ref}", timeout=15000)
+        page.wait_for_selector(".timeline li", timeout=15000)
+        check("forwarded to the legal-aid team" in page.locator(".timeline").inner_text(), f"[{name}] case timeline shows it was forwarded")
+
+        # ---------- Premium + phone-line PIN ----------
+        page.goto(f"{BASE}/premium")
+        page.wait_for_load_state("networkidle")
+        page.get_by_role("button", name="বিকাশে পেমেন্ট (ডেমো) · Pay with bKash (demo)").click()
+        page.wait_for_selector("text=আপনি প্রিমিয়াম সদস্য", timeout=15000)
+        page.goto(f"{BASE}/account")
+        page.wait_for_selector("#phone-pin", timeout=15000)
+        page.locator("#phone-pin").fill("1234")
+        page.get_by_role("button", name="পিন সেট করুন · Set PIN").click()
+        page.wait_for_selector("text=simple pattern", timeout=10000)
+        page.locator("#phone-pin").fill("4827")
+        page.get_by_role("button", name="পিন সেট করুন · Set PIN").click()
+        page.wait_for_selector("text=পিন সেট হয়েছে", timeout=10000)
+        check(page.get_by_text("A PIN is set.").count() == 1, f"[{name}] premium member set a phone-line PIN")
+
         # ---------- Account: memories visible, then delete ----------
         page.goto(f"{BASE}/account")
         page.wait_for_selector(".memory-item", timeout=15000)
@@ -285,6 +330,44 @@ with sync_playwright() as p:
         other = [e for e in problems if e not in csp and "favicon" not in e]
         check(not other, f"[{name}] no console errors or 5xx {other[:3]}")
         ctx.close()
+
+    # ---------- Licensed agency: register, auto-verify, publish a checked offer ----------
+    actx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ap = actx.new_page()
+    aproblems = []
+    ap.on("console", lambda m: aproblems.append(m.text) if m.type == "error" else None)
+    ap.goto(f"{BASE}/login?type=agency")
+    ap.wait_for_selector("text=Licensed agency")
+    check(ap.locator("button[aria-pressed='true']", has_text="Licensed agency").count() == 1, "[agency] sign-up preselects an agency account")
+    ap.locator("#name").fill("Shapla Representative")
+    ap.get_by_label("মোবাইল নম্বর · Mobile").fill("01710001001")
+    ap.locator("#password").fill("Agency!2026pass")
+    ap.get_by_role("button", name="অ্যাকাউন্ট খুলুন").click()
+    ap.wait_for_url("**/partner", timeout=20000)
+    ap.wait_for_selector("#ag-rl", timeout=15000)
+    ap.locator("#ag-rl").fill("RL-1001")
+    ap.locator("#ag-name").fill("Shapla Overseas")
+    ap.locator("#ag-phone").fill("01710001001")
+    ap.get_by_role("button", name="যাচাই করে নিবন্ধন · Verify and register").click()
+    ap.wait_for_selector("text=যাচাইকৃত · Verified", timeout=15000)
+    check(True, "[agency] RL number, name and official phone matched: verified instantly")
+    ap.locator("#of-job").fill("Hotel Cleaner")
+    ap.locator("#of-emp").fill("Al Noor Hotels")
+    ap.locator("#of-sal").fill("1300")
+    ap.locator("#of-cost").fill("500000")
+    ap.get_by_role("button", name="যাচাই করে প্রকাশ · Check and publish").click()
+    ap.wait_for_selector("text=Offer blocked", timeout=15000)
+    check("government ceiling" in ap.locator(".verdict-danger").inner_text(), "[agency] an offer above the legal cost is blocked with the reason")
+    ap.locator("#of-cost").fill("160000")
+    ap.get_by_role("button", name="যাচাই করে প্রকাশ · Check and publish").click()
+    ap.wait_for_selector("text=🟢 Live", timeout=15000)
+    check(True, "[agency] a compliant offer goes live")
+    ap.goto(f"{BASE}/offers")
+    ap.wait_for_selector("text=Hotel Cleaner", timeout=15000)
+    check(ap.locator(".ring.sm").count() >= 1, "[agency] the offer is public with the agency's confidence score")
+    check(not [e for e in aproblems if "favicon" not in e], f"[agency] no console errors {aproblems[:3]}")
+    ap.screenshot(path=f"{SHOTS}/agency-offers.png", full_page=True)
+    actx.close()
 
     # ---------- Reduced motion: every animated surface shows its final state ----------
     rctx = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")

@@ -13,7 +13,36 @@ const SESSION_DAYS = 30;
 
 export const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-pa_session" : "pa_session";
 
-export type User = { id: string; phone: string; name: string; memory_enabled: boolean };
+export type Role = "worker" | "agency" | "legal" | "admin";
+export type User = { id: string; phone: string; name: string; memory_enabled: boolean; role: Role; premium_until: Date | string | null };
+
+const USER_COLS = "u.id, u.phone, u.name, u.memory_enabled, u.role, u.premium_until";
+
+export function isPremium(u: Pick<User, "premium_until" | "role">): boolean {
+  if (u.role === "legal" || u.role === "admin") return true;
+  return !!u.premium_until && new Date(u.premium_until).getTime() > Date.now();
+}
+
+/**
+ * Staff roles are granted by configuration, not by any API: STAFF_PHONES="01711111111:admin,01811111111:legal".
+ * Applied at every login, so removing a number from the list demotes it on next login.
+ */
+function staffRole(phone: string): Role | null {
+  for (const entry of (process.env.STAFF_PHONES ?? "").split(",")) {
+    const [p, r] = entry.trim().split(":");
+    if (p && normalisePhone(p) === phone && (r === "legal" || r === "admin")) return r;
+  }
+  return null;
+}
+
+async function syncStaffRole(user: User): Promise<User> {
+  const staff = staffRole(user.phone);
+  const want: Role | null = staff ?? (user.role === "legal" || user.role === "admin" ? "worker" : null);
+  if (!want || want === user.role) return user;
+  const db = await requireDb();
+  await db.query("UPDATE users SET role = $1 WHERE id = $2", [want, user.id]);
+  return { ...user, role: want };
+}
 
 const COMMON = new Set(["12345678", "123456789", "password", "password1", "11111111", "00000000", "bangladesh", "qwerty123", "abcd1234", "iloveyou"]);
 
@@ -56,7 +85,7 @@ async function requireDb() {
   return db;
 }
 
-export async function register(phoneRaw: string, name: string, password: string): Promise<User> {
+export async function register(phoneRaw: string, name: string, password: string, role: "worker" | "agency" = "worker"): Promise<User> {
   const phone = normalisePhone(phoneRaw);
   if (!phone) throw new HttpError(400, "Enter a valid Bangladeshi mobile number (01XXXXXXXXX)");
   const problem = passwordProblem(password);
@@ -66,22 +95,23 @@ export async function register(phoneRaw: string, name: string, password: string)
   const db = await requireDb();
   const hash = await hashPassword(password);
   const rows = await db.query<User>(
-    "INSERT INTO users (phone, name, password_hash) VALUES ($1, $2, $3) ON CONFLICT (phone) DO NOTHING RETURNING id, phone, name, memory_enabled",
-    [phone, cleanName, hash],
+    "INSERT INTO users (phone, name, password_hash, role) VALUES ($1, $2, $3, $4) ON CONFLICT (phone) DO NOTHING RETURNING id, phone, name, memory_enabled, role, premium_until",
+    [phone, cleanName, hash, role],
   );
   if (!rows[0]) throw new HttpError(409, "An account with this number already exists. Please log in.");
-  return rows[0];
+  return syncStaffRole(rows[0]);
 }
 
 export async function login(phoneRaw: string, password: string): Promise<User> {
   const phone = normalisePhone(phoneRaw);
   const db = await requireDb();
-  const rows = phone ? await db.query<User & { password_hash: string }>("SELECT id, phone, name, memory_enabled, password_hash FROM users WHERE phone = $1", [phone]) : [];
+  const rows = phone ? await db.query<User & { password_hash: string }>(`SELECT ${USER_COLS}, u.password_hash FROM users u WHERE u.phone = $1`, [phone]) : [];
   const row = rows[0];
   dummyHash ??= hashPassword(randomBytes(12).toString("hex"));
   const ok = await verifyPassword(password, row?.password_hash ?? (await dummyHash));
   if (!row || !ok) throw new HttpError(401, "Wrong phone number or password");
-  return { id: row.id, phone: row.phone, name: row.name, memory_enabled: row.memory_enabled };
+  const { password_hash: _omit, ...user } = row;
+  return syncStaffRole(user);
 }
 
 export async function createSession(userId: string): Promise<{ token: string; maxAge: number }> {
@@ -109,7 +139,7 @@ export async function currentUser(req: Request): Promise<User | null> {
   const db = await getDb();
   if (!db) return null;
   const rows = await db.query<User>(
-    "SELECT u.id, u.phone, u.name, u.memory_enabled FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now()",
+    `SELECT ${USER_COLS} FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now()`,
     [sha256(token)],
   );
   return rows[0] ?? null;
@@ -132,5 +162,58 @@ export function clearSessionCookie(): string {
 }
 
 export function publicUser(u: User) {
-  return { name: u.name, phone: `${u.phone.slice(0, 3)}*****${u.phone.slice(-3)}`, memoryEnabled: u.memory_enabled };
+  return {
+    name: u.name,
+    phone: `${u.phone.slice(0, 3)}*****${u.phone.slice(-3)}`,
+    memoryEnabled: u.memory_enabled,
+    role: u.role,
+    premium: isPremium(u),
+    premiumUntil: u.premium_until ? new Date(u.premium_until).toISOString() : null,
+  };
+}
+
+/** Loads the logged-in user or throws 401/403. Pass roles to restrict an endpoint. */
+export async function requireUser(req: Request, roles?: Role[]): Promise<User> {
+  const user = await currentUser(req);
+  if (!user) throw new HttpError(401, "Please log in");
+  if (roles && !roles.includes(user.role)) throw new HttpError(403, "You don't have access to this");
+  return user;
+}
+
+// Phone-line PIN: 4–6 digits, hashed like a password. Used by the AI phone agent to
+// identify a caller, because caller ID alone can be spoofed.
+export function pinProblem(pin: string): string | null {
+  if (!/^\d{4,6}$/.test(pin)) return "PIN must be 4 to 6 digits";
+  if (/^(\d)\1+$/.test(pin) || "0123456789".includes(pin) || "9876543210".includes(pin)) return "Choose a PIN that isn't a simple pattern";
+  return null;
+}
+
+export async function setPhonePin(user: User, pin: string | null): Promise<void> {
+  const db = await requireDb();
+  if (pin === null) {
+    await db.query("UPDATE users SET phone_pin_hash = NULL WHERE id = $1", [user.id]);
+    return;
+  }
+  const problem = pinProblem(pin);
+  if (problem) throw new HttpError(400, problem);
+  await db.query("UPDATE users SET phone_pin_hash = $1 WHERE id = $2", [await hashPassword(pin), user.id]);
+}
+
+export async function hasPhonePin(userId: string): Promise<boolean> {
+  const db = await requireDb();
+  const rows = await db.query<{ has: boolean }>("SELECT phone_pin_hash IS NOT NULL AS has FROM users WHERE id = $1", [userId]);
+  return !!rows[0]?.has;
+}
+
+/** Looks up a user by phone and checks their phone PIN (constant work whether or not the user exists). */
+export async function verifyPhonePin(phoneRaw: string, pin: string): Promise<User | null> {
+  const phone = normalisePhone(phoneRaw);
+  const db = await requireDb();
+  const rows = phone ? await db.query<User & { phone_pin_hash: string | null }>(`SELECT ${USER_COLS}, u.phone_pin_hash FROM users u WHERE u.phone = $1`, [phone]) : [];
+  const row = rows[0];
+  dummyHash ??= hashPassword(randomBytes(12).toString("hex"));
+  const ok = await verifyPassword(pin.replace(/\D/g, ""), row?.phone_pin_hash ?? (await dummyHash));
+  if (!row || !row.phone_pin_hash || !ok) return null;
+  const { phone_pin_hash: _omit, ...user } = row;
+  return user;
 }
