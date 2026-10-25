@@ -446,3 +446,32 @@ describe("gamified progress + real stats", () => {
     assert.deepEqual((await call(C, "/api/stats", { method: "GET" })).json, { offersChecked: null, dangersFlagged: null });
   });
 });
+
+describe("gamification measurement (aggregate events)", () => {
+  test("only allow-listed events are counted, cross-site posts refused", async () => {
+    assert.equal((await call(A, "/api/events", { body: { event: "milestone:checked_offer" } })).status, 200);
+    assert.equal((await call(A, "/api/events", { body: { event: "milestone:free_points" } })).status, 400);
+    assert.equal((await call(A, "/api/events", { body: { event: "quiz_pass:hard", userId: "x" } })).status, 400);
+    assert.equal((await call(A, "/api/events", { body: { event: "milestone:checked_offer" }, origin: "https://evil.example" })).status, 403);
+  });
+
+  test("event flooding is rate-limited", async () => {
+    const ip = "198.51.100.9";
+    let status = 0;
+    for (let i = 0; i < 125; i++) status = (await call(A, "/api/events", { headers: { "x-real-ip": ip }, body: { event: "quiz_round:easy" } })).status;
+    assert.equal(status, 429);
+  });
+
+  test("objective funnel is visible only with the health token", async () => {
+    for (const e of ["milestone:checked_offer", "milestone:verified_agency", "milestone:true_cost", "level:prepared"]) await call(A, "/api/events", { body: { event: e } });
+    const pub = await call(A, "/api/health", { method: "GET" });
+    assert.deepEqual(pub.json, { ok: true });
+    const res = await fetch(`${A}/api/health`, { headers: { "x-health-token": "health-token-for-tests-123456" } });
+    const j = await res.json();
+    assert.ok(j.funnel.firstChecks >= 2);
+    assert.equal(typeof j.funnel.verifiedAgencyPct, "number");
+    assert.ok(j.funnel.events["milestone:true_cost"] >= 1);
+    const wrong = await fetch(`${A}/api/health`, { headers: { "x-health-token": "health-token-for-tests-XXXXXX" } });
+    assert.deepEqual(await wrong.json(), { ok: true });
+  });
+});

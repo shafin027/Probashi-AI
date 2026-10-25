@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Elevator } from "@lucasmarkes/hairline/react";
 import { useJourney } from "@/components/journey.tsx";
 import { useFeatures } from "@/components/features.tsx";
-import { LEVELS, levelFor, MILESTONES, nextLevel, nextStep } from "@/lib/journey.ts";
+import { LEVELS, levelFor, nextLevel, nextStep, PHASES, phaseScore, phaseUnlocked } from "@/lib/journey.ts";
 import { HELPLINES } from "@/lib/data/countries.ts";
 
 const VCARD = [
@@ -25,6 +25,9 @@ export default function JourneyPage() {
   const upcoming = nextLevel(points);
   const step = nextStep(progress);
   const levelIndex = LEVELS.indexOf(level);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const helpLink = `https://wa.me/?text=${encodeURIComponent(`বিদেশে চাকরির অফার পেয়েছ? টাকা দেওয়ার আগে ফ্রি যাচাই করে নাও, ২০ সেকেন্ড লাগে: ${origin}/check`)}`;
+  const quizLink = `https://wa.me/?text=${encodeURIComponent(`দালালের ফাঁদ চিনতে পারো? ২ মিনিটের কুইজটা খেলে দেখো: ${origin}/quiz`)}`;
   const shareText = `আমি Probashi AI-তে নিরাপদ বিদেশযাত্রার প্রস্তুতি নিচ্ছি: ${points}/100 (${level.bn})। তুমিও টাকা দেওয়ার আগে যাচাই করো: ${typeof window !== "undefined" ? window.location.origin : ""}/journey`;
 
   return (
@@ -75,43 +78,79 @@ export default function JourneyPage() {
         </div>
       </div>
 
-      <h2 style={{ marginTop: 16 }}>১০টি নিরাপত্তা ধাপ · 10 safety steps</h2>
-      <div className="grid grid-2">
-        {MILESTONES.map((m, i) => {
-          const done = progress.done.includes(m.id);
-          return (
-            <motion.div
-              key={m.id}
-              className={`card milestone ${done ? "done" : ""}`}
-              initial={reduce ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.05 * i, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="milestone-check" aria-hidden>{done ? "✓" : i + 1}</div>
-              <div style={{ flex: 1 }}>
-                <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
-                  <strong>{m.bn}</strong>
-                  <span className="badge">{done ? (m.manual ? "সম্পন্ন (নিজে জানানো)" : "সম্পন্ন") : `+${m.points}`}</span>
-                </div>
-                <div className="small">{m.en}{m.manual && <span className="self-reported"> · self-reported</span>}</div>
-                <div className="small muted">{m.why}</div>
-                {!done && (
-                  <div className="row" style={{ marginTop: 10, gap: 8 }}>
-                    {m.manual ? (
-                      <>
-                        <a className="btn btn-ghost btn-sm" href={m.href} target={m.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{m.cta}</a>
-                        <button className="btn btn-sm" type="button" onClick={() => complete(m.id)}>✓ আমি করেছি</button>
-                      </>
-                    ) : (
-                      <Link className="btn btn-ghost btn-sm" href={m.href}>{m.cta} →</Link>
-                    )}
-                  </div>
-                )}
+      {PHASES.map((phase, pi) => {
+        const unlocked = phaseUnlocked(progress, phase.id);
+        const pts = phase.id === "before" ? points : phaseScore(progress, phase.id);
+        return (
+          <section key={phase.id} className={`phase ${unlocked ? "" : "locked"}`} aria-labelledby={`phase-${phase.id}`}>
+            <div className="phase-head">
+              <div>
+                <span className="badge">ধাপ {pi + 1} / {PHASES.length}</span>
+                <h2 id={`phase-${phase.id}`} style={{ margin: "6px 0 0" }}>
+                  {phase.bn} <span className="muted small">· {phase.en}</span>
+                </h2>
               </div>
-            </motion.div>
-          );
-        })}
-      </div>
+              <div className="phase-meter">
+                <div className="meter" aria-hidden><span style={{ width: `${pts}%` }} /></div>
+                <span className="small muted">{pts}/100</span>
+              </div>
+            </div>
+            {!unlocked ? (
+              <div className="card phase-lock">
+                <span aria-hidden style={{ fontSize: "1.6rem" }}>🔒</span>
+                <div>
+                  <strong>“{levelFor(phase.unlockAt).bn}” হলে খুলবে</strong>
+                  <div className="small muted">
+                    Unlocks at {phase.unlockAt} readiness: first protect yourself before you pay. আরও {phase.unlockAt - points} পয়েন্ট বাকি।
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-2">
+                {phase.milestones.map((m, i) => {
+                  const done = progress.done.includes(m.id);
+                  const share = m.id === "helped_someone" ? helpLink : m.id === "shared_quiz" ? quizLink : null;
+                  return (
+                    <motion.div
+                      key={m.id}
+                      className={`card milestone ${done ? "done" : ""}`}
+                      initial={reduce ? false : { opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.45, delay: 0.04 * i, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      <div className="milestone-check" aria-hidden>{done ? "✓" : i + 1}</div>
+                      <div style={{ flex: 1 }}>
+                        <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+                          <strong>{m.bn}</strong>
+                          <span className="badge">{done ? (m.manual ? "সম্পন্ন (নিজে জানানো)" : "সম্পন্ন") : `+${m.points}`}</span>
+                        </div>
+                        <div className="small">{m.en}{m.manual && <span className="self-reported"> · self-reported</span>}</div>
+                        <div className="small muted">{m.why}</div>
+                        {!done && (
+                          <div className="row" style={{ marginTop: 10, gap: 8 }}>
+                            {share ? (
+                              <a className="btn btn-sm" href={share} target="_blank" rel="noreferrer" onClick={() => complete(m.id)}>
+                                WhatsApp-এ পাঠান · Share
+                              </a>
+                            ) : m.manual ? (
+                              <>
+                                <a className="btn btn-ghost btn-sm" href={m.href} target={m.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">{m.cta}</a>
+                                <button className="btn btn-sm" type="button" onClick={() => complete(m.id)}>✓ আমি করেছি</button>
+                              </>
+                            ) : (
+                              <Link className="btn btn-ghost btn-sm" href={m.href}>{m.cta} →</Link>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
 
       <div className="card" id="emergency">
         <h3>📞 জরুরি নম্বর · Emergency numbers</h3>

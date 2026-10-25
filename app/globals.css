@@ -351,3 +351,11 @@ input[type="checkbox"] { accent-color: var(--primary); }
   .journey-hero .hairline-wrap { display: none; }
 }
 .watermark img { height: 44px; }
+.phase { margin-top: 28px; }
+.phase-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.phase-meter { display: flex; align-items: center; gap: 10px; min-width: 200px; }
+.phase-meter .meter { flex: 1; }
+.phase.locked h2 { color: var(--muted); }
+.phase-lock { display: flex; gap: 14px; align-items: center; background: var(--surface-2); border-style: dashed; }
+.phase-card { height: 100%; }
+.phase-icon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 1.5rem; background: color-mix(in srgb, var(--olive) 28%, var(--surface)); margin-bottom: 10px; }

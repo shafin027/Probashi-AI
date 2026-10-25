@@ -11,7 +11,6 @@ const LINKS = [
   { href: "/agency", label: "এজেন্সি যাচাই", en: "Agencies" },
   { href: "/ask", label: "প্রশ্ন করুন", en: "Ask" },
   { href: "/plan", label: "পরিবার ও টাকা", en: "Family" },
-  { href: "/quiz", label: "কুইজ", en: "Scam quiz" },
 ];
 
 export function Nav() {

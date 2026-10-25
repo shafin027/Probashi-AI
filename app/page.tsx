@@ -180,16 +180,36 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section section-alt" id="quiz-teaser">
+      <section className="section section-alt" id="journey">
         <div className="container">
-          <Reveal className="card quiz-teaser">
-            <div style={{ fontSize: "2.4rem" }} aria-hidden>🕵️</div>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <h3 style={{ margin: 0 }}>দালালের ফাঁদ চিনতে পারবেন? · Can you spot the scam?</h3>
-              <p className="muted small" style={{ margin: "4px 0 0" }}>6 real situations, 2 minutes. Different every time. Score 80% to earn your Scam Spotter badge.</p>
-            </div>
-            <Link className="btn btn-accent" href="/quiz">কুইজ খেলুন →</Link>
+          <Reveal>
+            <span className="badge">নিরাপদ যাত্রা · Your safety journey</span>
+            <h2 style={{ marginTop: 10 }}>টাকা দেওয়া থেকে বিদেশে পৌঁছানো পর্যন্ত, প্রতিটি ধাপে পাশে আছি</h2>
+            <p className="muted" style={{ maxWidth: 720 }}>
+              প্রতিটি কাজ আপনার নিরাপত্তা স্কোর বাড়ায়, আর সবসময় দেখায় পরের জরুরি কাজ কোনটা।
+              <span className="en">Every real step raises your readiness score, and the next step is always one tap away.</span>
+            </p>
           </Reveal>
+          <div className="grid grid-3" style={{ marginTop: 20 }}>
+            {[
+              { n: "১", t: "টাকা দেওয়ার আগে", e: "Check the offer, verify the agency, know the true cost, register with BMET.", i: "🛡️" },
+              { n: "২", t: "বিদেশে পৌঁছে", e: "Keep your passport, check your salary, send money home safely.", i: "✈️" },
+              { n: "৩", t: "অন্যকে রক্ষা করুন", e: "Help a friend or relative check their offer before they pay.", i: "🤝" },
+            ].map((p, k) => (
+              <Reveal key={p.t} delay={0.05 * k}>
+                <div className="card phase-card">
+                  <div className="phase-icon" aria-hidden>{p.i}</div>
+                  <div className="small muted">ধাপ {p.n}</div>
+                  <h3 style={{ margin: "4px 0" }}>{p.t}</h3>
+                  <p className="small muted" style={{ margin: 0 }}>{p.e}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <div className="row" style={{ marginTop: 20 }}>
+            <Link className="btn" href="/journey">আমার প্রস্তুতি দেখুন →</Link>
+            <Link className="small" href="/quiz">🕵️ ২ মিনিটের প্রতারণা-চেনার কুইজ · Quick scam quiz</Link>
+          </div>
         </div>
       </section>
 

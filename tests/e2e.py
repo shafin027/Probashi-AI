@@ -225,10 +225,27 @@ with sync_playwright() as p:
         check(True, f"[{name}] earned milestone is celebrated (positive moment)")
         page.goto(f"{BASE}/journey")
         page.wait_for_load_state("networkidle")
+        mid_pts = int(page.locator(".ring.lg").get_attribute("data-score"))
+        if mid_pts < 50:
+            check(page.locator("#phase-abroad").locator("xpath=ancestor::section").locator(".phase-lock").count() == 1, f"[{name}] 'After you arrive' phase is locked below 50 ({mid_pts})")
         page.get_by_role("button", name="✓ আমি করেছি").first.click()
         page.wait_for_timeout(400)
         end_pts = int(page.locator(".ring.lg").get_attribute("data-score"))
         check(end_pts >= start_pts + 20, f"[{name}] quiz + manual step raise readiness ({start_pts} -> {end_pts})")
+        check(end_pts >= 50, f"[{name}] readiness reached Prepared ({end_pts})")
+        abroad = page.locator("#phase-abroad").locator("xpath=ancestor::section")
+        check(abroad.locator(".phase-lock").count() == 0 and abroad.locator(".milestone").count() == 5, f"[{name}] goal chaining: 'After you arrive' unlocked with 5 steps")
+        protector = page.locator("#phase-protector").locator("xpath=ancestor::section")
+        share = protector.get_by_role("link", name="WhatsApp-এ পাঠান · Share").first
+        href = share.get_attribute("href") or ""
+        check(href.startswith("https://wa.me/?text=") and "%2Fcheck" in href, f"[{name}] 'help someone' shares the check link on WhatsApp")
+        share.click()
+        page.wait_for_timeout(300)
+        for extra in ctx.pages[1:]:
+            extra.close()
+        page.wait_for_timeout(300)
+        check(protector.locator(".milestone.done").count() >= 1, f"[{name}] helping someone completes a Protect-others step")
+        check(page.locator(".next-step").count() == 1, f"[{name}] a next step is always shown")
         page.screenshot(path=f"{SHOTS}/{name}-journey.png", full_page=True)
 
         # Progress follows the account to a new device.

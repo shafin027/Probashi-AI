@@ -28,6 +28,8 @@ export function Footer() {
               <li><Link href="/agency">Agency Lookup</Link></li>
               <li><Link href="/ask">Ask in Bangla</Link></li>
               <li><Link href="/plan">Family &amp; Money Plan</Link></li>
+              <li><Link href="/journey">Safety Journey</Link></li>
+              <li><Link href="/quiz">Scam-spotter quiz</Link></li>
               <li><Link href="/privacy">Privacy &amp; Security</Link></li>
               <li><Link href="/about">About &amp; business model</Link></li>
             </ul>

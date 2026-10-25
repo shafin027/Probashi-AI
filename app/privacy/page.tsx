@@ -14,6 +14,7 @@ export default function PrivacyPage() {
         <li><strong>Without an account: nothing.</strong> Uploaded documents and messages are used once for your check and are never written to disk or a database.</li>
         <li><strong>With an account:</strong> your name, mobile number, a salted scrypt hash of your password (never the password itself), and, only if Memory is on, short notes about your checks and questions.</li>
         <li>We never store document images, never sell data, and agencies never see your information.</li>
+        <li>To improve the safety journey we count anonymous events (for example “a step was completed”). These are totals only, with no user ID or IP address stored.</li>
         <li>Memory can be turned off (which erases it), single memories can be deleted, and the whole account can be deleted from the Account page.</li>
       </ul>
 

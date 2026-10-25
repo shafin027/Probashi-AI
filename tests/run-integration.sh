@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 WITH_SERVER="../.claude/skills/webapp-testing/scripts/with_server.py"
 MOCK="http://127.0.0.1:4010"
-COMMON="NODE_ENV=production REPORT_SECRET=integration-test-secret-0123456789abcdef PAYMENT_MODE=demo"
+COMMON="NODE_ENV=production REPORT_SECRET=integration-test-secret-0123456789abcdef PAYMENT_MODE=demo HEALTH_TOKEN=health-token-for-tests-123456"
 # Unset any ambient credentials/base URLs so only the mock is ever called.
 CLEAN="env -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL -u ANTHROPIC_AUTH_TOKEN -u OPENAI_API_KEY -u OPENAI_BASE_URL -u DATABASE_URL"
 
