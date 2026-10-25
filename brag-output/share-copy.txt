@@ -1,0 +1,26 @@
+# Probashi AI: launch video share copy
+
+## X / Twitter
+A broker asks ৳6,50,000 for a "free visa". The legal limit is ৳1,65,000.
+Probashi AI checks the offer before you pay: snap it, ask by voice, in Bangla.
+Built for YUNet AIgnite Buildathon 2026.
+
+## LinkedIn
+Every year, Bangladeshi migrant workers pay brokers far more than the government-set limit, often for visas that do not exist.
+
+We built Probashi AI, a Bangla, voice-first safety copilot. You photograph an offer or describe it out loud. It then:
+• flags scam patterns (free/azad visa, money to a personal account, passport held by a broker)
+• compares the asked cost with the official limit
+• walks you through each step of a safe migration journey
+
+Free to check. In Bangla. Voice-first.
+Built for YUNet AIgnite Buildathon 2026.
+
+## Facebook (Bangla)
+দালাল চাইছে ৳৬,৫০,০০০, সরকার নির্ধারিত খরচ ৳১,৬৫,০০০।
+টাকা দেওয়ার আগে যাচাই করুন: ছবি তুলুন বা বাংলায় বলুন, Probashi AI জানিয়ে দেবে কোথায় বিপদ।
+ফ্রি · বাংলায় · কণ্ঠে প্রশ্ন
+
+## YouTube
+Title: Probashi AI: check the offer before you pay (21 s)
+Description: A Bangla, voice-first AI copilot that helps Bangladeshi migrant workers spot visa scams and overcharging before paying a broker. Built for YUNet AIgnite Buildathon 2026. Demo figures are illustrative; the agencies shown are fictional.

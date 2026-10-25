@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<title>Probashi AI brag</title>
+<link rel="stylesheet" href="fonts/fonts-local.css" />
+<style>
+  :root {
+    --forest: #2d4a2b; --forest-deep: #15231a; --olive: #a4ac86; --sage: #7d8471; --ivory: #faf9f6;
+    --ink: #1d2a1c; --muted: #5d6555; --line: #dcdccf; --danger: #b3261e; --danger-bg: #fbe3e0;
+    --caution: #9a6a00; --caution-bg: #fbf0d4; --safe: #2f7d3a; --gold: #b8862b; --terracotta: #b5452f;
+    --head: "Noto Serif Bengali", Georgia, serif; --body: "Hind Siliguri", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; }
+  body {
+    font-family: var(--body); color: var(--ink); background: var(--ivory);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  .dark { background: radial-gradient(1400px 900px at 70% 30%, #284430, var(--forest-deep) 70%); color: var(--ivory); }
+  .glow { position: absolute; inset: 0; background: radial-gradient(900px 500px at 85% 0%, rgba(164,172,134,.28), transparent 70%), radial-gradient(800px 500px at 0% 100%, rgba(181,69,47,.07), transparent 70%); }
+  .center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .eyebrow { font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 22px; color: var(--forest); }
+  .en { display: block; font-family: var(--body); font-weight: 500; color: var(--muted); }
+  .dark .en { color: rgba(250,249,246,.72); }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 28px; box-shadow: 0 2px 6px rgba(29,42,28,.06), 0 30px 70px rgba(29,42,28,.14); }
+
+  /* Scene 1 */
+  #bubble { position: absolute; left: 150px; top: 320px; width: 700px; padding: 30px 34px 26px; border-radius: 30px 30px 30px 8px; background: #22362a; border: 1px solid rgba(250,249,246,.12); box-shadow: 0 30px 60px rgba(0,0,0,.35); }
+  #bubble .who { font-size: 22px; color: var(--olive); font-weight: 600; margin-bottom: 10px; }
+  #typed { font-size: 34px; line-height: 1.55; min-height: 210px; color: var(--ivory); }
+  #bubble .meta { font-size: 18px; color: rgba(250,249,246,.5); text-align: right; margin-top: 8px; }
+  #price { position: absolute; left: 960px; top: 340px; width: 840px; }
+  #price .label { font-size: 30px; color: var(--olive); font-weight: 600; }
+  #priceNum { font-family: var(--head); font-weight: 700; font-size: 150px; line-height: 1.1; color: var(--ivory); font-variant-numeric: tabular-nums; }
+  #ask { position: absolute; left: 960px; top: 610px; width: 840px; }
+  #ask .q { font-family: var(--head); font-weight: 700; font-size: 92px; color: #ffb4a6; }
+  #ask .en { font-size: 36px; margin-top: 4px; }
+
+  /* Scene 2 / 6 */
+  .brand-stack { display: grid; justify-items: center; gap: 22px; }
+  .headline { font-family: var(--head); font-weight: 700; font-size: 108px; line-height: 1.15; }
+  .headline em { font-style: normal; color: var(--terracotta); }
+  .brand { font-family: var(--head); font-weight: 700; font-size: 46px; letter-spacing: .01em; color: var(--forest); display: flex; align-items: center; gap: 16px; }
+  .dark .brand { color: var(--ivory); }
+
+  /* Scene 3 */
+  .cap { position: absolute; left: 150px; top: 92px; right: 150px; }
+  .cap .bn { font-family: var(--head); font-weight: 700; font-size: 60px; }
+  .cap .en { font-size: 30px; margin-top: 4px; }
+  #doc { position: absolute; left: 150px; top: 300px; width: 640px; height: 660px; padding: 40px; overflow: hidden; transform-origin: 50% 50%; }
+  #doc .chip { display: inline-block; font-size: 18px; font-weight: 700; letter-spacing: .16em; background: #f1f0e8; padding: 8px 14px; border-radius: 10px; }
+  #doc .loc { float: right; font-size: 20px; color: var(--muted); margin-top: 6px; }
+  #doc .row { font-size: 27px; margin-top: 28px; display: flex; justify-content: space-between; border-bottom: 1px dashed var(--line); padding-bottom: 12px; }
+  #doc .row b { font-weight: 700; }
+  #doc .row.hot b { color: var(--danger); }
+  #doc .bars span { display: block; height: 14px; border-radius: 7px; background: #f1f0e8; margin-top: 18px; }
+  #scan { position: absolute; left: 0; right: 0; top: 0; height: 5px; background: linear-gradient(90deg, transparent, var(--olive), var(--forest), var(--olive), transparent); box-shadow: 0 0 30px var(--olive); }
+  #verdict { position: absolute; left: 860px; top: 300px; width: 910px; padding: 34px 38px; border-color: rgba(179,38,30,.35); }
+  .vhead { display: flex; align-items: center; gap: 26px; }
+  .ring { --v: 100; --c: var(--danger); width: 150px; height: 150px; border-radius: 50%; flex: none; display: grid; place-items: center; background: conic-gradient(var(--c) calc(var(--v) * 1%), rgba(179,38,30,.13) 0); }
+  .ring > span { width: 116px; height: 116px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-family: var(--head); font-weight: 700; font-size: 50px; }
+  .vtitle { font-family: var(--head); font-weight: 700; font-size: 58px; color: var(--danger); line-height: 1.2; }
+  .vsub { font-size: 26px; color: var(--muted); }
+  .flags { list-style: none; margin-top: 24px; display: grid; gap: 14px; }
+  .flag { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-radius: 16px; background: var(--danger-bg); border-left: 7px solid var(--danger); }
+  .flag.med { background: var(--caution-bg); border-left-color: var(--caution); }
+  .flag .t { font-size: 31px; font-weight: 700; line-height: 1.25; }
+  .flag .t small { display: block; font-size: 21px; font-weight: 500; color: var(--muted); }
+  .sev { flex: none; font-size: 20px; font-weight: 700; padding: 6px 14px; border-radius: 999px; background: #fff; color: var(--danger); }
+  .flag.med .sev { color: var(--caution); }
+  .more { margin-top: 14px; font-size: 24px; color: var(--muted); }
+
+  /* Scene 4 */
+  #cost { position: absolute; left: 150px; right: 150px; top: 300px; }
+  .crow { display: grid; grid-template-columns: 420px 1fr 360px; align-items: center; gap: 28px; margin-bottom: 34px; }
+  .crow .lbl { font-size: 38px; font-weight: 700; }
+  .crow .lbl small { display: block; font-size: 24px; font-weight: 500; color: var(--muted); }
+  .track { height: 54px; border-radius: 16px; background: #eeede4; overflow: hidden; }
+  .fill { height: 100%; border-radius: 16px; transform-origin: left center; }
+  .crow .amt { font-family: var(--head); font-weight: 700; font-size: 58px; text-align: right; font-variant-numeric: tabular-nums; }
+  #extra { position: absolute; left: 150px; right: 150px; top: 640px; display: flex; align-items: center; gap: 36px; padding: 34px 44px; border-radius: 28px; background: #fff; border: 2px solid rgba(181,69,47,.45); box-shadow: 0 30px 60px rgba(181,69,47,.14); }
+  #extra .big { font-family: var(--head); font-weight: 700; font-size: 104px; color: var(--terracotta); line-height: 1; }
+  #extra .x { font-family: var(--head); font-weight: 700; font-size: 64px; color: #fff; background: var(--terracotta); border-radius: 22px; padding: 10px 26px; }
+  #extra .txt { font-size: 32px; font-weight: 700; }
+  #extra .txt small { display: block; font-size: 23px; font-weight: 500; color: var(--muted); }
+  .src { position: absolute; left: 150px; bottom: 70px; font-size: 22px; color: var(--muted); }
+
+  /* Scene 5 */
+  #voice { position: absolute; left: 150px; top: 320px; width: 760px; }
+  .micwrap { position: relative; width: 190px; height: 190px; }
+  .pulse { position: absolute; inset: 0; border-radius: 50%; border: 4px solid var(--forest); }
+  .mic { position: absolute; inset: 22px; border-radius: 50%; background: var(--forest); display: grid; place-items: center; box-shadow: 0 20px 40px rgba(45,74,43,.35); }
+  .wave { display: flex; gap: 8px; align-items: center; height: 80px; margin-left: 30px; }
+  .wave i { display: block; width: 10px; border-radius: 6px; background: var(--forest); }
+  .qb { margin-top: 38px; display: inline-block; font-size: 40px; font-weight: 700; color: #fff; background: var(--forest); padding: 18px 28px; border-radius: 28px 28px 8px 28px; }
+  .ab { margin-top: 20px; font-size: 30px; line-height: 1.5; background: #fff; border: 1px solid var(--line); padding: 18px 26px; border-radius: 28px 28px 28px 8px; max-width: 720px; box-shadow: 0 20px 40px rgba(29,42,28,.08); }
+  #ready { position: absolute; left: 1040px; top: 300px; width: 730px; padding: 40px; display: grid; justify-items: center; gap: 18px; }
+  #ready .ring { width: 250px; height: 250px; --c: var(--forest); background: conic-gradient(var(--c) calc(var(--v) * 1%), rgba(45,74,43,.12) 0); }
+  #ready .ring > span { width: 196px; height: 196px; font-size: 84px; }
+  .lvl { font-family: var(--head); font-weight: 700; font-size: 46px; white-space: nowrap; }
+  .phases { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .phase { font-size: 24px; font-weight: 700; padding: 10px 18px; border-radius: 999px; border: 2px solid var(--line); color: var(--muted); }
+  .phase.on { border-color: var(--forest); color: var(--forest); background: #eef0e6; }
+
+  /* Scene 6 */
+  .tag { font-family: var(--head); font-weight: 700; font-size: 84px; }
+  .chips { display: flex; gap: 16px; justify-content: center; }
+  .chips span { font-size: 30px; font-weight: 700; padding: 12px 26px; border-radius: 999px; border: 2px solid rgba(250,249,246,.35); }
+  .built { font-size: 24px; color: rgba(250,249,246,.66); letter-spacing: .04em; margin-top: 18px; }
+</style>
+</head>
+<body>
+<!-- 1 HOOK -->
+<section class="scene dark" id="s1">
+  <div class="glow"></div>
+  <div id="bubble">
+    <div class="who">দালাল · Broker (WhatsApp)</div>
+    <div id="typed"></div>
+    <div class="meta">10:42 ✓✓</div>
+  </div>
+  <div id="price"><div class="label">মোট খরচ · Total cost</div><div id="priceNum">৳০</div></div>
+  <div id="ask"><div class="q">এই অফারে দেবেন?</div><span class="en">Would you pay this for that offer?</span></div>
+</section>
+
+<!-- 2 REVEAL -->
+<section class="scene" id="s2">
+  <div class="center"><div class="brand-stack">
+    <svg id="seal2" width="150" height="150" viewBox="0 0 64 64" fill="none" stroke="#2d4a2b" stroke-linecap="round" stroke-linejoin="round">
+      <path class="draw" d="M32 4 L54 12 V30 C54 45 44 55 32 60 C20 55 10 45 10 30 V12 Z" stroke-width="3.5" />
+      <path class="draw" d="M22 32 L29 39 L43 24" stroke-width="4.5" />
+    </svg>
+    <div class="headline" id="h2">টাকা দেওয়ার আগে <em>যাচাই করুন</em></div>
+    <div class="en" id="h2en" style="font-size:40px">Check the offer before you pay.</div>
+    <div class="brand" id="b2">Probashi AI</div>
+  </div></div>
+</section>
+
+<!-- 3 CHECK -->
+<section class="scene" id="s3">
+  <div class="cap" id="cap3"><div class="bn">ছবি তুলুন, প্রতিটি লাল পতাকা দেখুন</div><span class="en">Snap the offer. See every red flag, in Bangla.</span></div>
+  <div class="card" id="doc">
+    <span class="chip">EMPLOYMENT OFFER</span><span class="loc">Riyadh · Saudi Arabia</span>
+    <div class="row"><span>Position</span><b>Cleaner</b></div>
+    <div class="row"><span>Monthly salary</span><b>SAR 1,200</b></div>
+    <div class="row hot"><span>Visa</span><b>FREE VISA (azad)</b></div>
+    <div class="row hot"><span>Fee to agent</span><b>BDT 650,000</b></div>
+    <div class="row hot"><span>Pay to</span><b>Personal bKash</b></div>
+    <div class="bars"><span style="width:92%"></span><span style="width:74%"></span><span style="width:84%"></span></div>
+    <div id="scan"></div>
+  </div>
+  <div class="card" id="verdict">
+    <div class="vhead">
+      <div class="ring" id="ring3"><span id="ring3n">100</span></div>
+      <div>
+        <div class="vtitle" id="vt">বিপদ! টাকা দেবেন না</div>
+        <div class="vsub" id="vs">Danger: do not pay until these are solved</div>
+      </div>
+    </div>
+    <ul class="flags">
+      <li class="flag" id="f0"><span class="t">ফ্রি/আজাদ ভিসা<small>“Free / azad visa” offered</small></span><span class="sev">বড় ঝুঁকি</span></li>
+      <li class="flag" id="f1"><span class="t">সরকার নির্ধারিত খরচের অনেক বেশি<small>Asked cost is 3.9× the official limit</small></span><span class="sev">বড় ঝুঁকি</span></li>
+      <li class="flag" id="f2"><span class="t">টাকা ব্যক্তিকে দেওয়া হচ্ছে<small>Money goes to a person, not the agency</small></span><span class="sev">বড় ঝুঁকি</span></li>
+      <li class="flag med" id="f3"><span class="t">পাসপোর্ট দালালের কাছে<small>Passport handed to a broker</small></span><span class="sev">মাঝারি</span></li>
+    </ul>
+    <div class="more" id="more">+ আরও ৫টি লাল পতাকা · 5 more red flags found</div>
+  </div>
+</section>
+
+<!-- 4 COST -->
+<section class="scene" id="s4">
+  <div class="cap" id="cap4"><div class="bn">আসল খরচ, এক নজরে</div><span class="en">The true cost, at a glance.</span></div>
+  <div id="cost">
+    <div class="crow"><div class="lbl">সরকারি সর্বোচ্চ<small>Official limit (Saudi Arabia)</small></div><div class="track"><div class="fill" id="bar1" style="background:var(--olive);width:25.4%"></div></div><div class="amt" id="amt1">৳১,৬৫,০০০</div></div>
+    <div class="crow"><div class="lbl">দালাল চাইছে<small>The broker asks</small></div><div class="track"><div class="fill" id="bar2" style="background:var(--terracotta);width:100%"></div></div><div class="amt" id="amt2">৳৬,৫০,০০০</div></div>
+  </div>
+  <div id="extra"><div class="big">৳৪,৮৫,০০০</div><div class="txt">বাড়তি টাকা<small>Extra over the legal limit</small></div><div class="x">৩.৯×</div></div>
+  <div class="src">Source: Ministry of Expatriates' Welfare cost circular · checked by Probashi AI's rule engine</div>
+</section>
+
+<!-- 5 VOICE + JOURNEY -->
+<section class="scene" id="s5">
+  <div class="cap" id="cap5"><div class="bn">বাংলায় বলুন, ধাপে ধাপে প্রস্তুত হন</div><span class="en">Ask by voice. Get ready, step by step.</span></div>
+  <div id="voice">
+    <div style="display:flex;align-items:center">
+      <div class="micwrap"><div class="pulse" id="p1"></div><div class="pulse" id="p2"></div>
+        <div class="mic"><svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div></div>
+      <div class="wave" id="wave"></div>
+    </div>
+    <div class="qb" id="qb">ফ্রি ভিসা কি নিরাপদ?</div>
+    <div class="ab" id="ab">আজাদ/ফ্রি ভিসা সৌদিতে অবৈধ। কোনো মালিক আপনার দায়িত্ব নেয় না।</div>
+  </div>
+  <div class="card" id="ready">
+    <div class="ring" id="ring5"><span id="ring5n">0</span></div>
+    <div class="lvl" id="lvl">🌱 যাত্রা শুরু</div>
+    <div class="phases"><span class="phase on" id="ph1">টাকা দেওয়ার আগে</span><span class="phase" id="ph2">বিদেশে পৌঁছে</span><span class="phase" id="ph3">অন্যকে রক্ষা করুন</span></div>
+  </div>
+</section>
+
+<!-- 6 OUTRO -->
+<section class="scene dark" id="s6">
+  <div class="glow"></div>
+  <div class="center"><div class="brand-stack">
+    <svg id="seal6" width="170" height="170" viewBox="0 0 64 64" fill="none" stroke="#a4ac86" stroke-linecap="round" stroke-linejoin="round">
+      <path class="draw" d="M32 4 L54 12 V30 C54 45 44 55 32 60 C20 55 10 45 10 30 V12 Z" stroke-width="3.5" />
+      <path class="draw" d="M22 32 L29 39 L43 24" stroke-width="4.5" stroke="#faf9f6" />
+    </svg>
+    <div class="brand" id="b6" style="font-size:70px">Probashi AI</div>
+    <div class="tag" id="t6">টাকা দেওয়ার আগে যাচাই করুন</div>
+    <div class="chips" id="c6"><span>ফ্রি · Free</span><span>বাংলায় · In Bangla</span><span>কণ্ঠে প্রশ্ন · Voice-first</span></div>
+    <div class="built" id="w6">Built for YUNet AIgnite Buildathon 2026</div>
+  </div></div>
+</section>
+
+<script>
+const B = 0.6; // seconds per beat (100 BPM)
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const outCubic = (x) => 1 - Math.pow(1 - x, 3);
+const outExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+const inOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const $ = (id) => document.getElementById(id);
+const bn = (n) => Math.round(n).toLocaleString("bn-BD");
+const graphemes = (s) => [...new Intl.Segmenter("bn", { granularity: "grapheme" }).segment(s)].map((g) => g.segment);
+
+const MSG = graphemes("ভাই, সৌদিতে ফ্রি ভিসা আছে। কাজ: ক্লিনার। মোট খরচ ৬ লাখ ৫০ হাজার, এখন ২ লাখ অগ্রিম। পাসপোর্ট আমার কাছে জমা দিন।");
+const SCENES = [["s1", 0, 6], ["s2", 6, 10], ["s3", 10, 22], ["s4", 22, 27], ["s5", 27, 31], ["s6", 31, 36]];
+
+// Elements "enter" with a short rise; position is a pure function of t.
+function enter(el, t, at, dur = 0.45, dy = 28, dx = 0) {
+  const p = outCubic(seg(t, at, at + dur));
+  el.style.opacity = p;
+  el.style.transform = `translate(${(1 - p) * dx}px, ${(1 - p) * dy}px)`;
+}
+function drawSvg(svg, t, at, dur) {
+  svg.querySelectorAll(".draw").forEach((path, i) => {
+    const len = path.getTotalLength();
+    const p = inOut(seg(t, at + i * dur * 0.55, at + i * dur * 0.55 + dur));
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = len * (1 - p);
+  });
+}
+
+window.renderAt = function (t) {
+  // Scene visibility: dip through the background between scenes (no double exposure).
+  for (const [id, a, b] of SCENES) {
+    const s = a * B, e = b * B;
+    const vin = a === 0 ? 1 : outCubic(seg(t, s, s + 0.22));
+    const vout = b === 36 ? 1 : 1 - seg(t, e - 0.2, e);
+    const v = t < s || t >= e ? 0 : vin * vout;
+    $(id).style.opacity = v;
+    $(id).style.visibility = v > 0 ? "visible" : "hidden";
+  }
+
+  // 1 HOOK
+  enter($("bubble"), t, 0.0, 0.4, 24);
+  const typedN = Math.floor(MSG.length * outCubic(seg(t, 0.15, 1.7)));
+  $("typed").textContent = MSG.slice(0, typedN).join("") + (t < 1.75 && Math.floor(t * 4) % 2 === 0 ? "▍" : "");
+  enter($("price"), t, 0.5, 0.35, 20);
+  $("priceNum").textContent = "৳" + bn(650000 * outExpo(seg(t, 0.6, 1.8)));
+  enter($("ask"), t, 2.0, 0.4, 24);
+
+  // 2 REVEAL
+  drawSvg($("seal2"), t, 3.65, 0.55);
+  enter($("h2"), t, 4.0, 0.45, 34);
+  enter($("h2en"), t, 4.2, 0.4, 20);
+  enter($("b2"), t, 4.45, 0.4, 16);
+
+  // 3 CHECK
+  enter($("cap3"), t, 6.1, 0.4, 20);
+  const dp = outCubic(seg(t, 6.0, 6.6));
+  $("doc").style.opacity = dp;
+  $("doc").style.transform = `translateX(${(1 - dp) * -90}px) rotate(${-2 + dp * 0.6}deg)`;
+  const sp = seg(t, 6.6, 7.8);
+  $("scan").style.opacity = sp > 0 && sp < 1 ? 1 : 0;
+  $("scan").style.transform = `translateY(${inOut(sp) * 655}px)`;
+  enter($("verdict"), t, 7.8, 0.45, 0, 70);
+  const score = 100 * (1 - inOut(seg(t, 7.9, 9.0)));
+  $("ring3").style.setProperty("--v", Math.max(2, score));
+  $("ring3n").textContent = bn(score);
+  enter($("vt"), t, 8.4, 0.35, 12);
+  enter($("vs"), t, 8.55, 0.35, 10);
+  [9.0, 9.6, 10.2, 10.8].forEach((at, i) => enter($("f" + i), t, at, 0.35, 0, 60));
+  enter($("more"), t, 11.4, 0.35, 10);
+
+  // 4 COST
+  enter($("cap4"), t, 13.3, 0.4, 20);
+  const g1 = outCubic(seg(t, 13.4, 14.1)), g2 = outCubic(seg(t, 13.6, 14.4));
+  $("bar1").style.transform = `scaleX(${g1})`;
+  $("bar2").style.transform = `scaleX(${g2})`;
+  $("amt1").textContent = "৳" + bn(165000 * g1);
+  $("amt2").textContent = "৳" + bn(650000 * g2);
+  const ep = outCubic(seg(t, 14.4, 14.85));
+  $("extra").style.opacity = ep;
+  $("extra").style.transform = `translateY(${(1 - ep) * 30}px) scale(${0.96 + 0.04 * ep})`;
+  enter($("cost").parentElement.querySelector(".src"), t, 14.8, 0.4, 8);
+
+  // 5 VOICE + JOURNEY
+  enter($("cap5"), t, 16.3, 0.4, 20);
+  const pt = (t - 16.2) / B;
+  [$("p1"), $("p2")].forEach((p, i) => {
+    const ph = ((pt + i * 0.5) % 1 + 1) % 1;
+    p.style.transform = `scale(${1 + ph * 0.45})`;
+    p.style.opacity = t > 16.2 && t < 17.4 ? 0.55 * (1 - ph) : 0;
+  });
+  const wave = $("wave");
+  if (!wave.children.length) for (let i = 0; i < 18; i++) wave.appendChild(document.createElement("i"));
+  [...wave.children].forEach((bar, i) => {
+    const live = t > 16.3 && t < 17.4 ? 1 : 0.15;
+    bar.style.height = `${12 + live * 56 * Math.abs(Math.sin(t * 9 + i * 0.7) * Math.sin(i * 1.3 + t * 3))}px`;
+  });
+  enter($("qb"), t, 16.6, 0.35, 16);
+  enter($("ab"), t, 17.15, 0.4, 16);
+  enter($("ready"), t, 16.4, 0.45, 0, 60);
+  const rv = 55 * inOut(seg(t, 16.8, 17.9));
+  $("ring5").style.setProperty("--v", Math.max(2, rv));
+  $("ring5n").textContent = bn(rv);
+  $("lvl").textContent = rv >= 50 ? "🛡️ প্রস্তুত · Prepared" : rv >= 25 ? "🔍 সচেতন · Aware" : "🌱 যাত্রা শুরু · Getting started";
+  $("ph2").classList.toggle("on", rv >= 50);
+
+  // 6 OUTRO
+  drawSvg($("seal6"), t, 18.65, 0.55);
+  enter($("b6"), t, 18.95, 0.4, 18);
+  enter($("t6"), t, 19.2, 0.45, 22);
+  enter($("c6"), t, 19.55, 0.4, 16);
+  enter($("w6"), t, 19.85, 0.4, 10);
+};
+document.fonts.ready.then(() => { window.__ready = true; window.renderAt(0); });
+</script>
+</body>
+</html>

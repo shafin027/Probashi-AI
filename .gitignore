@@ -8,4 +8,7 @@ next-env.d.ts
 tests/screenshots/
 __pycache__/
 public/ocr/
-brag-output/work/
+brag-output/work/frames/
+brag-output/work/stills/
+brag-output/work/*.png
+brag-output/work/*.wav
